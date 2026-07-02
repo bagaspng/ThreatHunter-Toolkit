@@ -1,0 +1,27 @@
+=== HASIL RECON: https://erpskrip.id ===
+Waktu recon: 2026-07-02 10:33:39
+
+[Email ditemukan]
+erpskrip@gmail.com
+
+[Nomor telepon ditemukan]
++6285966523396
+0819-3269-6996
+091501564
+
+[Teknologi terdeteksi]
+Bootstrap
+Next.js
+Server: nginx
+Server: nginx/1.18.0 (Ubuntu)
+Server: nginx/1.24.0 (Ubuntu)
+X-Powered-By: Next.js
+jQuery
+
+[Subdomain ditemukan] (6)
+api.erpskrip.id
+dashboard.erpskrip.id
+erpskrip.id
+mail.erpskrip.id
+ns1.erpskrip.id
+ns2.erpskrip.id
