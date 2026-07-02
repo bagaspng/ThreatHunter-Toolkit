@@ -2,7 +2,6 @@ from modules import encoder
 from modules import decoder
 
 
-# Method name -> encode function.
 ENCODE_METHODS = {
     "base64": encoder.to_base64,
     "base32": encoder.to_base32,
@@ -12,7 +11,6 @@ ENCODE_METHODS = {
     "ascii": encoder.to_ascii,
 }
 
-# Method name -> decode function.
 DECODE_METHODS = {
     "base64": decoder.from_base64,
     "base32": decoder.from_base32,
@@ -24,11 +22,6 @@ DECODE_METHODS = {
 
 
 def batch_process(lines, func):
-    """Run `func` over each line, returning (line, result) tuples.
-
-    If a line fails, its result is an "Error: ..." string so one bad
-    line does not abort the whole batch.
-    """
     results = []
     for line in lines:
         try:
@@ -39,12 +32,10 @@ def batch_process(lines, func):
 
 
 def batch_encode(lines, method):
-    """Encode every line using the named method."""
     func = ENCODE_METHODS[method]
     return batch_process(lines, func)
 
 
 def batch_decode(lines, method):
-    """Decode every line using the named method."""
     func = DECODE_METHODS[method]
     return batch_process(lines, func)
