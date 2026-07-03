@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+lxml
+urllib3
+fake-useragent
+cryptography
+git+https://github.com/chorsley/python-Wappalyzer.git
