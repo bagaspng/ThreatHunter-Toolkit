@@ -4,4 +4,5 @@ lxml
 urllib3
 fake-useragent
 cryptography
+python-Wappalyzer
 git+https://github.com/chorsley/python-Wappalyzer.git
