@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python3 obfuscate.py -i x --encode base64)",
+      "Bash(python3 main.py)",
+      "Bash(command -v node)",
+      "Bash(echo \"node: $\\(command -v node && node --version\\)\")",
+      "Bash(command -v npm)",
+      "Bash(npm --version)",
+      "Bash(echo \"npm: $\\(command -v npm && npm --version\\)\")",
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -c \"import bs4,lxml;print\\('py deps OK'\\)\")",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('jsdom'\\);console.log\\('jsdom OK'\\)\")",
+      "Bash(./node_modules/.bin/javascript-obfuscator --help)",
+      "Bash(./node_modules/.bin/javascript-obfuscator --version)",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python obfuscate.py -i __TRACKED_VAR__/sample.html -o __TRACKED_VAR__/out.html)",
+      "Bash(.venv/bin/python obfuscate.py --type html)",
+      "Bash(.venv/bin/python obfuscate.py -t js)",
+      "Bash(node -e ' *)",
+      "Bash(.venv/bin/python obfuscate.py -i __TRACKED_VAR__/sample.html -o __TRACKED_VAR__/final.html)",
+      "Bash(rm -f modules/js_obfuscator.py)",
+      "Bash(rm -rf __pycache__ modules/__pycache__)",
+      "Bash(rm -f .DS_Store)",
+      "Bash(rm -rf .venv)",
+      "Bash(grep -v '^node_modules$')",
+      "Bash(rm -f modules/obfuscator.py modules/deobfuscator.py)",
+      "Bash(python3 -m py_compile main.py)",
+      "Bash(sed -n '/1\\\\. Encode/,/8\\\\. Keluar/p')",
+      "Bash(rm -f __pycache__/*.pyc)"
+    ]
+  }
+}
