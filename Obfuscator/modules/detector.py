@@ -1,7 +1,6 @@
 import base64
 import re
 
-
 def is_base64(data):
     data = data.strip()
     if len(data) < 4 or len(data) % 4 != 0:
@@ -13,7 +12,6 @@ def is_base64(data):
         return True
     except Exception:
         return False
-
 
 def is_base32(data):
     data = data.strip()
@@ -27,7 +25,6 @@ def is_base32(data):
     except Exception:
         return False
 
-
 def is_hex(data):
     data = data.strip()
     if len(data) == 0 or len(data) % 2 != 0:
@@ -38,17 +35,14 @@ def is_hex(data):
     except Exception:
         return False
 
-
 def is_binary(data):
     cleaned = data.replace(" ", "").strip()
     if len(cleaned) == 0 or len(cleaned) % 8 != 0:
         return False
     return bool(re.fullmatch(r"[01]+", cleaned))
 
-
 def is_url_encoded(data):
     return bool(re.search(r"%[0-9A-Fa-f]{2}", data))
-
 
 def detect(data):
     return {

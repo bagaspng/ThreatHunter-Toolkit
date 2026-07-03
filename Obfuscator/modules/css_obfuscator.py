@@ -1,22 +1,11 @@
-"""Obfuscator CSS: acak nama class/id dan hasilkan mapping.
-
-Pendekatan: walker sederhana yang melacak kedalaman brace supaya hanya
-bagian *selector* yang di-rename (bukan nilai deklarasi seperti warna
-`#fff`). At-rule yang menampung rule bersarang (@media, @supports, dst)
-dikenali agar selector di dalamnya ikut diproses.
-"""
-
 import random
 import re
 import string
 
-
-# At-rule yang isinya rule bersarang (bukan deklarasi langsung).
 _NEST_ATRULES = (
     "media", "supports", "container", "document", "scope", "layer",
     "keyframes", "-webkit-keyframes", "-moz-keyframes", "-o-keyframes",
 )
-
 
 def _rand_class(used):
     while True:
@@ -25,30 +14,22 @@ def _rand_class(used):
             used.add(name)
             return name
 
-
 def _rename_selectors(text, mapping, used):
     def repl(m):
-        key = m.group(0)  # sudah termasuk '.' atau '#'
+        key = m.group(0)
         if key not in mapping:
             mapping[key] = m.group(1) + _rand_class(used)
         return mapping[key]
 
     return re.sub(r"([.#])(-?[_a-zA-Z][\w-]*)", repl, text)
 
-
 def obfuscate_css(css, mapping=None):
-    """Return (css_teracak, mapping).
-
-    mapping: dict `.orig`/`#orig` -> `.new`/`#new`, konsisten lintas
-    pemanggilan kalau dict yang sama dilempar balik.
-    """
     if mapping is None:
         mapping = {}
     used = {v.lstrip(".#") for v in mapping.values()}
 
     out = []
     prelude = []
-    # stack berisi 'decl' (isi deklarasi) atau 'nest' (isi rule bersarang)
     stack = []
 
     def in_selector_ctx():
@@ -109,9 +90,7 @@ def obfuscate_css(css, mapping=None):
     emit_prelude()
     return "".join(out), mapping
 
-
 def apply_mapping_to_html_attrs(class_value, mapping):
-    """Bantu terjemahkan nilai attribute class HTML memakai mapping CSS."""
     tokens = class_value.split()
     result = []
     for tok in tokens:

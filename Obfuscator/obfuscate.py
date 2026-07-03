@@ -1,18 +1,3 @@
-#!/usr/bin/env python3
-"""CLI obfuscator HTML / CSS / JS (termasuk HTML hybrid).
-
-Python berperan sebagai orchestrator; bagian JavaScript diobfuscate lewat
-`javascript-obfuscator` (Node.js) sebagai subprocess. Mode HTML mengikuti gaya
-phpkobo: TANPA opsi (tidak ada level / format payload / hapus-dari-DOM).
-
-Contoh:
-    # Mode file
-    python obfuscate.py --input page.html --output page.obf.html
-
-    # Mode paste/stdin (akhiri dengan Ctrl+D), hasil ke terminal
-    python obfuscate.py --type html
-"""
-
 import argparse
 import json
 import os
@@ -20,7 +5,6 @@ import sys
 
 from modules import css_obfuscator
 from modules import js_engine
-
 
 def detect_type(path, forced, content):
     if forced != "auto":
@@ -39,7 +23,6 @@ def detect_type(path, forced, content):
         return "html"
     return "html"
 
-
 def read_input(args):
     if args.input:
         with open(args.input, "r", encoding="utf-8") as f:
@@ -49,26 +32,20 @@ def read_input(args):
               file=sys.stderr)
     return sys.stdin.read()
 
-
 def check_dependencies(need_html=False):
-    """Validasi node + javascript-obfuscator (dan bs4/lxml untuk HTML).
-
-    Return (ok, message).
-    """
     ok, msg = js_engine.check_dependencies()
     if not ok:
         return False, msg
     if need_html:
         try:
-            import bs4  # noqa: F401
-            import lxml  # noqa: F401
+            import bs4
+            import lxml
         except ImportError:
             return False, (
                 "Mode HTML butuh 'beautifulsoup4' + 'lxml'.\n"
                 "Install: pip install -r requirements.txt"
             )
     return True, msg
-
 
 def build_parser():
     p = argparse.ArgumentParser(
@@ -86,7 +63,6 @@ def build_parser():
                    help="Lewati verifikasi jsdom untuk mode HTML.")
     return p
 
-
 def _run_html(content, args):
     from modules import html_obfuscator
     from modules import verifier
@@ -98,7 +74,6 @@ def _run_html(content, args):
         print(prefix + msg, file=sys.stderr)
     return final
 
-
 def main(argv=None):
     args = build_parser().parse_args(argv)
     content = read_input(args)
@@ -108,7 +83,6 @@ def main(argv=None):
 
     ftype = detect_type(args.input, args.type, content)
 
-    # CSS murni tidak butuh Node; HTML & JS butuh javascript-obfuscator.
     if ftype in ("html", "js"):
         ok, msg = check_dependencies(need_html=(ftype == "html"))
         if not ok:
@@ -144,7 +118,6 @@ def main(argv=None):
         if not result.endswith("\n"):
             sys.stdout.write("\n")
     return 0
-
 
 if __name__ == "__main__":
     try:

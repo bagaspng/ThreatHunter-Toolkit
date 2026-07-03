@@ -1,16 +1,9 @@
-"""Wrapper Python untuk verifikasi jsdom (modules/verify.js).
-
-Menjalankan loader hasil obfuscation di sandbox jsdom (Node subprocess) dan
-memastikan output decode runtime identik dengan dokumen asli yang di-encode.
-"""
-
 import os
 import subprocess
 import tempfile
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERIFY_JS = os.path.join(PROJECT_ROOT, "modules", "verify.js")
-
 
 def jsdom_available():
     try:
@@ -22,12 +15,7 @@ def jsdom_available():
     except FileNotFoundError:
         return False
 
-
 def verify(final_html, expected_rendered):
-    """Return (ok: bool, message: str).
-
-    ok=True hanya jika loader men-decode kembali persis `expected_rendered`.
-    """
     if not jsdom_available():
         return False, (
             "jsdom belum terpasang, verifikasi dilewati.\n"

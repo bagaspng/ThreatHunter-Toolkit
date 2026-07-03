@@ -1,30 +1,12 @@
-"""Wrapper subprocess untuk `javascript-obfuscator` (Node.js).
-
-Python berperan sebagai orchestrator; obfuscation JS yang sebenarnya
-didelegasikan ke tool `javascript-obfuscator` (Node.js) lewat subprocess.
-
-Alur `obfuscate()`:
-  1. Tulis kode JS ke file temporary.
-  2. Panggil CLI `javascript-obfuscator` dengan preset opsi tetap
-     (stringArray, controlFlowFlattening, selfDefending, dll).
-  3. Baca hasil dari file output, hapus semua file temporary.
-
-Sesuai keluhan pengguna, TIDAK ada opsi level/intensitas yang diekspos —
-seperti phpkobo, obfuscation berjalan dengan satu preset tetap.
-"""
-
 import os
 import shutil
 import subprocess
 import tempfile
 
-# Direktori root project (tempat package.json / node_modules berada).
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 BINARY_NAME = "javascript-obfuscator"
 
-# Preset opsi tetap (tanpa level). Nilai boolean dikirim sebagai string
-# "true"/"false" sesuai format CLI javascript-obfuscator.
 _PRESET = [
     "--compact", "true",
     "--control-flow-flattening", "true",
@@ -48,17 +30,10 @@ INSTALL_HINT = (
     "  npm install -g javascript-obfuscator\n"
 )
 
-
 def _node_available():
     return shutil.which("node") is not None
 
-
 def find_binary():
-    """Cari executable javascript-obfuscator.
-
-    Urutan: variabel env override -> PATH -> node_modules/.bin lokal project.
-    Return path (str) atau None kalau tidak ketemu.
-    """
     override = os.environ.get("JS_OBFUSCATOR_BIN")
     if override and os.path.exists(override):
         return override
@@ -72,17 +47,10 @@ def find_binary():
         return local
     return None
 
-
 def is_available():
     return _node_available() and find_binary() is not None
 
-
 def check_dependencies():
-    """Validasi node + javascript-obfuscator terpasang.
-
-    Return (ok: bool, message: str). message berisi instruksi kalau ada
-    yang kurang.
-    """
     problems = []
     if not _node_available():
         problems.append(
@@ -96,12 +64,7 @@ def check_dependencies():
         return False, "\n".join(problems)
     return True, "OK: node + javascript-obfuscator terdeteksi."
 
-
 def obfuscate(code):
-    """Obfuscate satu blok kode JS lewat subprocess javascript-obfuscator.
-
-    Raise RuntimeError kalau dependency belum ada atau proses gagal.
-    """
     binary = find_binary()
     if not _node_available() or binary is None:
         raise RuntimeError(INSTALL_HINT)

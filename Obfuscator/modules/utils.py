@@ -2,27 +2,22 @@ import os
 
 from modules import file_handler
 
-
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
-
 def pause():
     input("\nTekan Enter untuk melanjutkan...")
-
 
 def print_header(title):
     print("=" * 33)
     print(title.center(33))
     print("=" * 33)
 
-
 def get_input(prompt="Enter text: "):
     text = input(prompt)
     if text == "":
         raise ValueError("Input kosong")
     return text
-
 
 def get_multiline(prompt="Masukkan baris (baris kosong untuk selesai):"):
     print(prompt)
@@ -36,7 +31,6 @@ def get_multiline(prompt="Masukkan baris (baris kosong untuk selesai):"):
         raise ValueError("Input kosong")
     return lines
 
-
 def get_text_source():
     print("\nSumber input:")
     print("1. Input Teks Manual")
@@ -48,7 +42,6 @@ def get_text_source():
         data = file_handler.read_file(filename)
         return data.rstrip("\n")
     return get_input("Masukkan teks: ")
-
 
 def print_menu(title, options):
     print(f"\n=== {title} ===\n")

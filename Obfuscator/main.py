@@ -7,8 +7,6 @@ from modules import file_handler
 from modules import utils
 from modules import js_engine
 from modules import css_obfuscator
-# html_obfuscator di-import lazy di dalam menu karena butuh bs4/lxml,
-# supaya fitur lain tetap jalan meski dependency itu belum terpasang.
 
 def encode_menu():
     options = [
@@ -161,7 +159,6 @@ def _read_code_source():
     filename = input("\nMasukkan nama file: ").strip()
     return file_handler.read_file(filename)
 
-
 def _write_or_show(result, extra=None):
     output = input("\nSimpan ke file? (kosongkan untuk tampilkan): ").strip()
     if output:
@@ -173,10 +170,9 @@ def _write_or_show(result, extra=None):
         print("\n=== HASIL ===\n")
         print(result)
 
-
 def file_obfuscate_menu():
     options = [
-        "Obfuscate HTML (hybrid)", "Obfuscate JavaScript",
+        "Obfuscate HTML", "Obfuscate JavaScript",
         "Obfuscate CSS", "Kembali",
     ]
 
@@ -190,7 +186,6 @@ def file_obfuscate_menu():
             utils.pause()
             continue
 
-        # HTML & JS butuh Node.js + javascript-obfuscator.
         html_obfuscator = None
         if choice in ("1", "2"):
             ok, msg = js_engine.check_dependencies()
@@ -212,8 +207,6 @@ def file_obfuscate_menu():
             code = _read_code_source()
 
             if choice == "1":
-                # Ala phpkobo: tanpa opsi. Pipeline: inline JS -> cipher ->
-                # zero-width delimiter -> loader -> lapis luar obfuscator.
                 result, rendered = html_obfuscator.build(code)
                 ok, vmsg = verifier.verify(result, rendered)
                 print(("\n[verify] OK " if ok else "\n[verify] WARN ") + vmsg)
@@ -230,7 +223,6 @@ def file_obfuscate_menu():
         except Exception as e:
             print("Error:", e)
         utils.pause()
-
 
 def main():
     menu_actions = {
@@ -262,7 +254,6 @@ def main():
             utils.pause()
             continue
         action()
-
 
 if __name__ == "__main__":
     try:

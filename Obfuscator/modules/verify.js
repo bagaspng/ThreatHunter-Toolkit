@@ -1,13 +1,3 @@
-/*
- * Verifikasi otomatis: jalankan loader hasil obfuscation di sandbox jsdom,
- * tangkap string yang ditulis lewat document.write(), lalu bandingkan persis
- * dengan dokumen asli yang di-encode. Memastikan pipeline (substitution cipher
- * + zero-width delimiter + anti-tamper + 2 lapis) benar-benar lossless,
- * termasuk untuk emoji / unicode kompleks.
- *
- * Argumen: node verify.js <obfuscatedHtmlFile> <expectedRenderedFile>
- * Keluaran: cetak "MATCH" (exit 0) atau "MISMATCH ..." (exit 1).
- */
 "use strict";
 
 const fs = require("fs");
@@ -41,18 +31,14 @@ function main() {
   const expected = fs.readFileSync(expectedFile, "utf8");
   const script = extractScript(obfuscated);
 
-  // Sandbox: halaman kosong, punya mesin JS + window/document.
   const dom = new JSDOM("<!DOCTYPE html><html><head></head><body></body></html>", {
     runScripts: "dangerously",
   });
   const win = dom.window;
 
-  // Lengkapi global yang dipakai decoder tapi mungkin belum ada di jsdom.
   win.TextDecoder = TextDecoder;
   win.Uint8Array = Uint8Array;
 
-  // Tangkap argumen document.write alih-alih benar-benar menulis DOM,
-  // supaya perbandingan bisa byte-exact.
   const writes = [];
   win.document.open = function () { writes.length = 0; return win.document; };
   win.document.write = function (s) { writes.push(String(s)); };
@@ -72,7 +58,6 @@ function main() {
     process.exit(0);
   }
 
-  // Diagnostik ringkas kalau beda.
   let i = 0;
   const n = Math.min(captured.length, expected.length);
   while (i < n && captured[i] === expected[i]) i++;
