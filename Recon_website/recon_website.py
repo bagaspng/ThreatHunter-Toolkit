@@ -120,14 +120,18 @@ def discover_paths(base_url, base_soup, log_fn, max_paths=MAX_PATHS_PER_DOMAIN):
 
 
 def detect_technologies_wappalyzer(url, resp, log_fn):
-    found = set()
+    found = {}
     if not HAS_WAPPALYZER:
         log_fn("  [!] Wappalyzer tidak tersedia, deteksi teknologi dilewati.")
         return found
     try:
         webpage = WebPage(url, resp.text, dict(resp.headers))
-        techs = WAPPALYZER.analyze(webpage)
-        found.update(techs)
+        techs_with_versions = WAPPALYZER.analyze_with_versions(webpage)
+        for tech_name, tech_info in techs_with_versions.items():
+            versions = (
+                tech_info.get("versions", []) if isinstance(tech_info, dict) else []
+            )
+            found[tech_name] = versions
     except Exception as e:
         log_fn(f"  [!] Wappalyzer gagal menganalisis {url} -> {e}")
     return found
@@ -266,6 +270,17 @@ def read_urls_from_file(file_path):
     return urls
 
 
+def format_tech_for_log(tech_dict):
+    parts = []
+    for name, versions in sorted(tech_dict.items()):
+        versions = sorted((v for v in versions if v))
+        if versions:
+            parts.append(f"{name} {'/'.join(versions)}")
+        else:
+            parts.append(name)
+    return ", ".join(parts)
+
+
 def recon_single_target(base_url, log_fn):
     result = {
         "target": base_url,
@@ -281,7 +296,15 @@ def recon_single_target(base_url, log_fn):
     }
     all_emails = set()
     all_phones = set()
-    all_tech = set()
+    all_tech = {}
+
+    def merge_tech(target_dict, new_dict):
+        for name, versions in new_dict.items():
+            if name not in target_dict:
+                target_dict[name] = set(versions)
+            else:
+                target_dict[name].update(versions)
+
     log_fn(f"\n=== Recon target: {base_url} ===")
     log_fn("--- Tahap 1: Fetch halaman utama ---")
     resp, soup, err, ssl_warning = fetch(base_url)
@@ -297,14 +320,14 @@ def recon_single_target(base_url, log_fn):
     tech = detect_technologies_wappalyzer(base_url, resp, log_fn)
     all_emails.update(emails)
     all_phones.update(phones)
-    all_tech.update(tech)
+    merge_tech(all_tech, tech)
     result["pages_scanned"].append(base_url)
     if emails:
         log_fn(f"  [+] Email ditemukan: {', '.join(sorted(emails))}")
     if phones:
         log_fn(f"  [+] Telepon ditemukan: {', '.join(sorted(phones))}")
     if tech:
-        log_fn(f"  [+] Teknologi terdeteksi (Wappalyzer): {', '.join(sorted(tech))}")
+        log_fn(f"  [+] Teknologi terdeteksi (Wappalyzer): {format_tech_for_log(tech)}")
     log_fn("\n--- Tahap 2: Cari path internal (BeautifulSoup) ---")
     internal_paths = discover_paths(base_url, soup, log_fn)
     for path_url in internal_paths:
@@ -324,11 +347,11 @@ def recon_single_target(base_url, log_fn):
             log_fn(f"  [+] Telepon ditemukan: {', '.join(sorted(p_phones))}")
         if p_tech:
             log_fn(
-                f"  [+] Teknologi terdeteksi (Wappalyzer): {', '.join(sorted(p_tech))}"
+                f"  [+] Teknologi terdeteksi (Wappalyzer): {format_tech_for_log(p_tech)}"
             )
         all_emails.update(p_emails)
         all_phones.update(p_phones)
-        all_tech.update(p_tech)
+        merge_tech(all_tech, p_tech)
         result["pages_scanned"].append(path_url)
     domain_only = urlparse(base_url).netloc.replace("www.", "")
     log_fn(f"\n--- Tahap 3: Nmap scan pada {domain_only} ---")
@@ -368,7 +391,10 @@ def recon_single_target(base_url, log_fn):
     result["http_speed"] = speed_info
     result["emails"] = sorted(all_emails)
     result["phones"] = sorted(all_phones)
-    result["technologies"] = sorted(all_tech)
+    result["technologies"] = [
+        {"name": name, "versions": sorted((v for v in versions if v))}
+        for name, versions in sorted(all_tech.items())
+    ]
     return result
 
 
