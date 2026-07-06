@@ -1,11 +1,11 @@
 {
   "input_file": "url_list.txt",
-  "scanned_at": "2026-07-03 14:02:38",
+  "scanned_at": "2026-07-06 10:20:24",
   "total_targets": 5,
   "results": [
     {
       "target": "https://erpskrip.id",
-      "scanned_at": "2026-07-03 14:01:48",
+      "scanned_at": "2026-07-06 10:16:51",
       "emails": [
         "erpskrip@gmail.com"
       ],
@@ -47,6 +47,56 @@
           "versions": []
         }
       ],
+      "subdomains": [
+        "api.erpskrip.id",
+        "dashboard.erpskrip.id",
+        "erpskrip.id",
+        "mail.erpskrip.id",
+        "ns1.erpskrip.id",
+        "ns2.erpskrip.id"
+      ],
+      "ip_info": {
+        "ip": "103.81.64.247",
+        "whois_url": "https://ipwho.is/103.81.64.247",
+        "data": {
+          "ip": "103.81.64.247",
+          "success": true,
+          "type": "IPv4",
+          "continent": "Asia",
+          "continent_code": "AS",
+          "country": "Indonesia",
+          "country_code": "ID",
+          "region": "West Kalimantan",
+          "region_code": "KB",
+          "city": "Jalan Tanpa Nama",
+          "latitude": 0.2691776,
+          "longitude": 111.0414794,
+          "is_eu": false,
+          "postal": "79586",
+          "calling_code": "62",
+          "capital": "Jakarta",
+          "borders": "MY,PG,TL",
+          "flag": {
+            "img": "https://cdn.ipwhois.io/flags/id.svg",
+            "emoji": "🇮🇩",
+            "emoji_unicode": "U+1F1EE U+1F1E9"
+          },
+          "connection": {
+            "asn": 136055,
+            "org": "Pt Queen Network Nusantara",
+            "isp": "Pt Queen Network Nusantara",
+            "domain": "qnn.co.id"
+          },
+          "timezone": {
+            "id": "Asia/Pontianak",
+            "abbr": "WIB",
+            "is_dst": false,
+            "offset": 25200,
+            "utc": "+07:00"
+          },
+          "readme": "https://ipwhois.io/docs"
+        }
+      },
       "pages_scanned": [
         "https://erpskrip.id",
         "https://erpskrip.id/rekayasa-solusi",
@@ -69,19 +119,19 @@
         "cert_issuer": "Sectigo Limited",
         "cert_not_after": "2026-07-18 23:59:59",
         "cert_expired": false,
-        "handshake_ms": 240.67,
+        "handshake_ms": 79.64,
         "error": null
       },
       "http_speed": {
-        "total_ms": 202.04,
+        "total_ms": 127.06,
         "status_code": 200,
         "error": null
       },
       "nmap": {
         "output": [
-          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-03 14:01 +0700",
+          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-06 10:17 +0700",
           "Nmap scan report for erpskrip.id (103.81.64.247)",
-          "Host is up (0.059s latency).",
+          "Host is up (0.0098s latency).",
           "rDNS record for 103.81.64.247: ip-103-81-64-247.qnn.net.id",
           "Not shown: 79 closed tcp ports (reset)",
           "PORT      STATE    SERVICE",
@@ -107,7 +157,7 @@
           "3128/tcp  filtered squid-http",
           "10000/tcp filtered snet-sensor-mgmt",
           "",
-          "Nmap done: 1 IP address (1 host up) scanned in 3.79 seconds"
+          "Nmap done: 1 IP address (1 host up) scanned in 2.92 seconds"
         ],
         "error": null
       },
@@ -115,7 +165,7 @@
     },
     {
       "target": "https://egawi.id",
-      "scanned_at": "2026-07-03 14:02:02",
+      "scanned_at": "2026-07-06 10:17:51",
       "emails": [
         "admin@egawi.id",
         "admin@grahasip.id"
@@ -152,6 +202,57 @@
           "versions": []
         }
       ],
+      "subdomains": [
+        "be.egawi.id",
+        "bejobs.egawi.id",
+        "dashboard.egawi.id",
+        "egawi.id",
+        "jobs.egawi.id",
+        "mail.egawi.id",
+        "qnn.egawi.id"
+      ],
+      "ip_info": {
+        "ip": "103.81.64.247",
+        "whois_url": "https://ipwho.is/103.81.64.247",
+        "data": {
+          "ip": "103.81.64.247",
+          "success": true,
+          "type": "IPv4",
+          "continent": "Asia",
+          "continent_code": "AS",
+          "country": "Indonesia",
+          "country_code": "ID",
+          "region": "West Kalimantan",
+          "region_code": "KB",
+          "city": "Jalan Tanpa Nama",
+          "latitude": 0.2691776,
+          "longitude": 111.0414794,
+          "is_eu": false,
+          "postal": "79586",
+          "calling_code": "62",
+          "capital": "Jakarta",
+          "borders": "MY,PG,TL",
+          "flag": {
+            "img": "https://cdn.ipwhois.io/flags/id.svg",
+            "emoji": "🇮🇩",
+            "emoji_unicode": "U+1F1EE U+1F1E9"
+          },
+          "connection": {
+            "asn": 136055,
+            "org": "Pt Queen Network Nusantara",
+            "isp": "Pt Queen Network Nusantara",
+            "domain": "qnn.co.id"
+          },
+          "timezone": {
+            "id": "Asia/Pontianak",
+            "abbr": "WIB",
+            "is_dst": false,
+            "offset": 25200,
+            "utc": "+07:00"
+          },
+          "readme": "https://ipwhois.io/docs"
+        }
+      },
       "pages_scanned": [
         "https://egawi.id",
         "https://egawi.id/fitur/kelola-kehadiran-waktu",
@@ -164,19 +265,19 @@
         "cert_issuer": "Let's Encrypt",
         "cert_not_after": "2026-09-01 19:12:14",
         "cert_expired": false,
-        "handshake_ms": 93.2,
+        "handshake_ms": 42.34,
         "error": null
       },
       "http_speed": {
-        "total_ms": 442.32,
+        "total_ms": 100.62,
         "status_code": 200,
         "error": null
       },
       "nmap": {
         "output": [
-          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-03 14:02 +0700",
+          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-06 10:18 +0700",
           "Nmap scan report for egawi.id (103.81.64.247)",
-          "Host is up (0.026s latency).",
+          "Host is up (0.010s latency).",
           "rDNS record for 103.81.64.247: ip-103-81-64-247.qnn.net.id",
           "Not shown: 79 closed tcp ports (reset)",
           "PORT      STATE    SERVICE",
@@ -202,7 +303,7 @@
           "3128/tcp  filtered squid-http",
           "10000/tcp filtered snet-sensor-mgmt",
           "",
-          "Nmap done: 1 IP address (1 host up) scanned in 3.12 seconds"
+          "Nmap done: 1 IP address (1 host up) scanned in 2.51 seconds"
         ],
         "error": null
       },
@@ -210,7 +311,7 @@
     },
     {
       "target": "https://qnn.co.id",
-      "scanned_at": "2026-07-03 14:02:08",
+      "scanned_at": "2026-07-06 10:18:37",
       "emails": [],
       "phones": [],
       "technologies": [
@@ -221,6 +322,58 @@
           ]
         }
       ],
+      "subdomains": [
+        "admin.qnn.co.id",
+        "api.adv.qnn.co.id",
+        "api.erpkeuangan.qnn.co.id",
+        "api.kepegawaian.qnn.co.id",
+        "api.qnn.co.id",
+        "cacti.qnn.co.id",
+        "combro.qnn.co.id",
+        "www.qnn.co.id"
+      ],
+      "ip_info": {
+        "ip": "103.81.64.239",
+        "whois_url": "https://ipwho.is/103.81.64.239",
+        "data": {
+          "ip": "103.81.64.239",
+          "success": true,
+          "type": "IPv4",
+          "continent": "Asia",
+          "continent_code": "AS",
+          "country": "Indonesia",
+          "country_code": "ID",
+          "region": "West Kalimantan",
+          "region_code": "KB",
+          "city": "Jalan Tanpa Nama",
+          "latitude": 0.2691776,
+          "longitude": 111.0414794,
+          "is_eu": false,
+          "postal": "79586",
+          "calling_code": "62",
+          "capital": "Jakarta",
+          "borders": "MY,PG,TL",
+          "flag": {
+            "img": "https://cdn.ipwhois.io/flags/id.svg",
+            "emoji": "🇮🇩",
+            "emoji_unicode": "U+1F1EE U+1F1E9"
+          },
+          "connection": {
+            "asn": 136055,
+            "org": "Pt Queen Network Nusantara",
+            "isp": "Pt Queen Network Nusantara",
+            "domain": "qnn.co.id"
+          },
+          "timezone": {
+            "id": "Asia/Pontianak",
+            "abbr": "WIB",
+            "is_dst": false,
+            "offset": 25200,
+            "utc": "+07:00"
+          },
+          "readme": "https://ipwhois.io/docs"
+        }
+      },
       "pages_scanned": [
         "https://qnn.co.id"
       ],
@@ -230,21 +383,21 @@
         "cert_issuer": "Let's Encrypt",
         "cert_not_after": "2026-07-01 03:46:03",
         "cert_expired": true,
-        "handshake_ms": 40.18,
+        "handshake_ms": 38.22,
         "error": null
       },
       "http_speed": {
-        "total_ms": 168.84,
+        "total_ms": 86.62,
         "status_code": 200,
         "error": null
       },
       "nmap": {
         "output": [
-          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-03 14:02 +0700",
+          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-06 10:18 +0700",
           "Nmap scan report for qnn.co.id (103.81.64.239)",
-          "Host is up (0.051s latency).",
+          "Host is up (0.016s latency).",
           "rDNS record for 103.81.64.239: qnn.net.id",
-          "Not shown: 86 filtered tcp ports (no-response), 9 filtered tcp ports (host-prohibited)",
+          "Not shown: 87 filtered tcp ports (no-response), 8 filtered tcp ports (host-prohibited)",
           "PORT     STATE  SERVICE",
           "22/tcp   open   ssh",
           "80/tcp   open   http",
@@ -252,7 +405,7 @@
           "3000/tcp open   ppp",
           "8000/tcp closed http-alt",
           "",
-          "Nmap done: 1 IP address (1 host up) scanned in 3.76 seconds"
+          "Nmap done: 1 IP address (1 host up) scanned in 2.68 seconds"
         ],
         "error": null
       },
@@ -263,7 +416,7 @@
     },
     {
       "target": "https://admin.qnn.co.id",
-      "scanned_at": "2026-07-03 14:02:13",
+      "scanned_at": "2026-07-06 10:19:02",
       "emails": [],
       "phones": [],
       "technologies": [
@@ -278,6 +431,52 @@
           ]
         }
       ],
+      "subdomains": [
+        "admin.qnn.co.id",
+        "api.admin.qnn.co.id"
+      ],
+      "ip_info": {
+        "ip": "103.81.64.239",
+        "whois_url": "https://ipwho.is/103.81.64.239",
+        "data": {
+          "ip": "103.81.64.239",
+          "success": true,
+          "type": "IPv4",
+          "continent": "Asia",
+          "continent_code": "AS",
+          "country": "Indonesia",
+          "country_code": "ID",
+          "region": "West Kalimantan",
+          "region_code": "KB",
+          "city": "Jalan Tanpa Nama",
+          "latitude": 0.2691776,
+          "longitude": 111.0414794,
+          "is_eu": false,
+          "postal": "79586",
+          "calling_code": "62",
+          "capital": "Jakarta",
+          "borders": "MY,PG,TL",
+          "flag": {
+            "img": "https://cdn.ipwhois.io/flags/id.svg",
+            "emoji": "🇮🇩",
+            "emoji_unicode": "U+1F1EE U+1F1E9"
+          },
+          "connection": {
+            "asn": 136055,
+            "org": "Pt Queen Network Nusantara",
+            "isp": "Pt Queen Network Nusantara",
+            "domain": "qnn.co.id"
+          },
+          "timezone": {
+            "id": "Asia/Pontianak",
+            "abbr": "WIB",
+            "is_dst": false,
+            "offset": 25200,
+            "utc": "+07:00"
+          },
+          "readme": "https://ipwhois.io/docs"
+        }
+      },
       "pages_scanned": [
         "https://admin.qnn.co.id"
       ],
@@ -287,21 +486,21 @@
         "cert_issuer": "Let's Encrypt",
         "cert_not_after": "2025-02-16 03:26:40",
         "cert_expired": true,
-        "handshake_ms": 137.94,
+        "handshake_ms": 136.49,
         "error": null
       },
       "http_speed": {
-        "total_ms": 143.2,
+        "total_ms": 89.34,
         "status_code": 200,
         "error": null
       },
       "nmap": {
         "output": [
-          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-03 14:02 +0700",
+          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-06 10:19 +0700",
           "Nmap scan report for admin.qnn.co.id (103.81.64.239)",
-          "Host is up (0.057s latency).",
+          "Host is up (0.013s latency).",
           "rDNS record for 103.81.64.239: qnn.net.id",
-          "Not shown: 90 filtered tcp ports (no-response), 5 filtered tcp ports (host-prohibited)",
+          "Not shown: 88 filtered tcp ports (no-response), 7 filtered tcp ports (host-prohibited)",
           "PORT     STATE  SERVICE",
           "22/tcp   open   ssh",
           "80/tcp   open   http",
@@ -309,7 +508,7 @@
           "3000/tcp open   ppp",
           "8000/tcp closed http-alt",
           "",
-          "Nmap done: 1 IP address (1 host up) scanned in 3.95 seconds"
+          "Nmap done: 1 IP address (1 host up) scanned in 2.75 seconds"
         ],
         "error": null
       },
@@ -320,7 +519,7 @@
     },
     {
       "target": "https://lihatwarta.id",
-      "scanned_at": "2026-07-03 14:02:18",
+      "scanned_at": "2026-07-06 10:19:30",
       "emails": [],
       "phones": [
         "080725002990",
@@ -358,6 +557,56 @@
           "versions": []
         }
       ],
+      "subdomains": [
+        "api.lihatwarta.id",
+        "dashboard.lihatwarta.id",
+        "lihatwarta.id",
+        "mail.lihatwarta.id",
+        "profile.lihatwarta.id",
+        "www.lihatwarta.id"
+      ],
+      "ip_info": {
+        "ip": "103.81.64.249",
+        "whois_url": "https://ipwho.is/103.81.64.249",
+        "data": {
+          "ip": "103.81.64.249",
+          "success": true,
+          "type": "IPv4",
+          "continent": "Asia",
+          "continent_code": "AS",
+          "country": "Indonesia",
+          "country_code": "ID",
+          "region": "West Kalimantan",
+          "region_code": "KB",
+          "city": "Jalan Tanpa Nama",
+          "latitude": 0.2691776,
+          "longitude": 111.0414794,
+          "is_eu": false,
+          "postal": "79586",
+          "calling_code": "62",
+          "capital": "Jakarta",
+          "borders": "MY,PG,TL",
+          "flag": {
+            "img": "https://cdn.ipwhois.io/flags/id.svg",
+            "emoji": "🇮🇩",
+            "emoji_unicode": "U+1F1EE U+1F1E9"
+          },
+          "connection": {
+            "asn": 136055,
+            "org": "Pt Queen Network Nusantara",
+            "isp": "Pt Queen Network Nusantara",
+            "domain": "qnn.co.id"
+          },
+          "timezone": {
+            "id": "Asia/Pontianak",
+            "abbr": "WIB",
+            "is_dst": false,
+            "offset": 25200,
+            "utc": "+07:00"
+          },
+          "readme": "https://ipwhois.io/docs"
+        }
+      },
       "pages_scanned": [
         "https://lihatwarta.id",
         "https://lihatwarta.id/company/about-us",
@@ -380,19 +629,19 @@
         "cert_issuer": "Let's Encrypt",
         "cert_not_after": "2026-08-06 03:35:19",
         "cert_expired": false,
-        "handshake_ms": 171.04,
+        "handshake_ms": 41.12,
         "error": null
       },
       "http_speed": {
-        "total_ms": 2375.47,
+        "total_ms": 1280.46,
         "status_code": 200,
         "error": null
       },
       "nmap": {
         "output": [
-          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-03 14:02 +0700",
+          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-06 10:20 +0700",
           "Nmap scan report for lihatwarta.id (103.81.64.249)",
-          "Host is up (0.043s latency).",
+          "Host is up (0.0043s latency).",
           "rDNS record for 103.81.64.249: ip-103-81-64-249.qnn.net.id",
           "Not shown: 79 closed tcp ports (reset)",
           "PORT      STATE    SERVICE",
@@ -418,7 +667,7 @@
           "3128/tcp  filtered squid-http",
           "10000/tcp filtered snet-sensor-mgmt",
           "",
-          "Nmap done: 1 IP address (1 host up) scanned in 4.03 seconds"
+          "Nmap done: 1 IP address (1 host up) scanned in 3.73 seconds"
         ],
         "error": null
       },
