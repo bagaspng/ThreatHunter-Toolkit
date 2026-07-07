@@ -10,3 +10,4 @@ selenium
 dnspython
 fastapi
 uvicorn
+curl-cffi
