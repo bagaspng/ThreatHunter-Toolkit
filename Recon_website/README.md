@@ -13,7 +13,7 @@ Script recon website (fetch halaman, deteksi teknologi, cari subdomain, cari ori
 1. Clone repo ini:
    ```bash
    git clone https://github.com/bagaspng/ThreatHunter-Toolkit.git
-   cd Recon_website
+   cd ThreatHunter-Toolkit/Recon_website
    ```
 
 2. Buat virtual environment (opsional tapi disarankan):
@@ -33,10 +33,18 @@ Script recon website (fetch halaman, deteksi teknologi, cari subdomain, cari ori
    - **macOS**: `brew install nmap`
    - **Windows**: download installer dari https://nmap.org/download.html
 
-5. Jalankan FlareSolverr lewat Docker (wajib jalan sebelum menjalankan script):
+5. Jalankan FlareSolverr (wajib jalan sebelum menjalankan script). Ada 2 cara:
+
+   **Cara A - docker compose (disarankan):**
    ```bash
-   docker run -d --name flaresolverr -p 8191:8191 -e LOG_LEVEL=info --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest
+   docker compose up -d
    ```
+
+   **Cara B - docker run manual:**
+   ```bash
+   docker run -d --name flaresolverr -p 127.0.0.1:8191:8191 -e LOG_LEVEL=info --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest
+   ```
+
    Pastikan sudah jalan dengan `docker ps | grep flaresolverr`.
 
 ## Cara pakai
