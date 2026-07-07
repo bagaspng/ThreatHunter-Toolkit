@@ -1,0 +1,160 @@
+{
+  "input_file": "urltest.txt",
+  "scanned_at": "2026-07-07 10:48:33",
+  "total_targets": 1,
+  "results": [
+    {
+      "target": "https://pekontelukkiluan.com",
+      "scanned_at": "2026-07-07 10:44:13",
+      "emails": [],
+      "phones": [
+        "033435954963",
+        "048389748253",
+        "055039074825",
+        "082119970336",
+        "0921861622",
+        "626258714814"
+      ],
+      "technologies": [
+        {
+          "name": "Bootstrap",
+          "versions": [
+            "1.10.0",
+            "5.3.0"
+          ]
+        },
+        {
+          "name": "Cloudflare",
+          "versions": []
+        },
+        {
+          "name": "Cloudflare Browser Insights",
+          "versions": []
+        },
+        {
+          "name": "Font Awesome",
+          "versions": [
+            "6.2.1",
+            "6.4.0",
+            "6.5.0"
+          ]
+        },
+        {
+          "name": "Google Font API",
+          "versions": []
+        },
+        {
+          "name": "Lightbox",
+          "versions": []
+        },
+        {
+          "name": "YouTube",
+          "versions": []
+        },
+        {
+          "name": "jQuery",
+          "versions": []
+        },
+        {
+          "name": "jsDelivr",
+          "versions": []
+        }
+      ],
+      "subdomains": [
+        "ftp.pekontelukkiluan.com",
+        "monitoring.pekontelukkiluan.com",
+        "www.pekontelukkiluan.com"
+      ],
+      "origin_ip_candidates": {},
+      "ip_info": {
+        "ip": "172.67.191.212",
+        "whois_url": "https://ipwho.is/172.67.191.212",
+        "data": {
+          "ip": "172.67.191.212",
+          "success": true,
+          "type": "IPv4",
+          "continent": "North America",
+          "continent_code": "NA",
+          "country": "United States",
+          "country_code": "US",
+          "region": "California",
+          "region_code": "CA",
+          "city": "San Francisco",
+          "latitude": 37.718128,
+          "longitude": -122.4343849,
+          "is_eu": false,
+          "postal": "94102",
+          "calling_code": "1",
+          "capital": "Washington D.C.",
+          "borders": "CA,MX",
+          "flag": {
+            "img": "https://cdn.ipwhois.io/flags/us.svg",
+            "emoji": "🇺🇸",
+            "emoji_unicode": "U+1F1FA U+1F1F8"
+          },
+          "connection": {
+            "asn": 13335,
+            "org": "Cloudflare, Inc.",
+            "isp": "Cloudflare, Inc.",
+            "domain": "cloudflare.com"
+          },
+          "timezone": {
+            "id": "America/Los_Angeles",
+            "abbr": "PDT",
+            "is_dst": true,
+            "offset": -25200,
+            "utc": "-07:00"
+          },
+          "readme": "https://ipwhois.io/docs"
+        }
+      },
+      "pages_scanned": [
+        "https://pekontelukkiluan.com",
+        "https://pekontelukkiluan.com/index.php",
+        "https://pekontelukkiluan.com/detail-galeri/gapura.php?id=1",
+        "https://pekontelukkiluan.com/detail-galeri/laguna.php?id=1",
+        "https://pekontelukkiluan.com/detail-galeri/gigihiu.php?id=1",
+        "https://pekontelukkiluan.com/detail-galeri/dolphin.php?id=4",
+        "https://pekontelukkiluan.com/detail-galeri/pasirputih.php?id=1",
+        "https://pekontelukkiluan.com/detail-galeri/kelapa.php?id=1",
+        "https://pekontelukkiluan.com/penginapan/produk.php?id=34",
+        "https://pekontelukkiluan.com/penginapan/produk.php?id=33",
+        "https://pekontelukkiluan.com/penginapan/semua-produk.php"
+      ],
+      "ssl_tls": {
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "cert_issuer": "Let's Encrypt",
+        "cert_not_after": "2026-08-16 03:59:20",
+        "cert_expired": false,
+        "handshake_ms": 70.09,
+        "error": null
+      },
+      "http_speed": {
+        "total_ms": 321.34,
+        "status_code": 403,
+        "error": null
+      },
+      "nmap": {
+        "output": [
+          "Starting Nmap 7.99 ( https://nmap.org ) at 2026-07-07 10:48 +0700",
+          "Nmap scan report for pekontelukkiluan.com (104.21.20.62)",
+          "Host is up (0.036s latency).",
+          "Other addresses for pekontelukkiluan.com (not scanned): 172.67.191.212 2606:4700:3031::6815:143e 2606:4700:3030::ac43:bfd4",
+          "Not shown: 96 filtered tcp ports (no-response)",
+          "PORT     STATE SERVICE",
+          "80/tcp   open  http",
+          "443/tcp  open  https",
+          "8080/tcp open  http-proxy",
+          "8443/tcp open  https-alt",
+          "",
+          "Nmap done: 1 IP address (1 host up) scanned in 3.35 seconds"
+        ],
+        "error": null
+      },
+      "errors": [
+        "Halaman utama diakses via fallback bypass Cloudflare (FlareSolverr)"
+      ]
+    }
+  ]
+}

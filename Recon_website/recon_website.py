@@ -1,5 +1,3 @@
-#catatan untuk test ke claudflare bypass belum di test secara extensif
-
 import re
 import sys
 import ssl
@@ -17,24 +15,10 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from Wappalyzer import Wappalyzer, WebPage
-
+from flaresolverr_client import fetch_via_flaresolverr, fetch_via_flaresolverr_with_retry, create_flaresolverr_session, destroy_flaresolverr_session
 HAS_NMAP = shutil.which('nmap') is not None
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 USER_AGENTS_FALLBACK = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15']
-try:
-    import undetected_chromedriver as uc
-    HAS_UC = True
-    _original_uc_del = uc.Chrome.__del__
-
-    def _safe_uc_del(self):
-        try:
-            _original_uc_del(self)
-        except Exception:
-            pass
-    uc.Chrome.__del__ = _safe_uc_del
-except ImportError:
-    HAS_UC = False
-    print('[i] undetected-chromedriver tidak tersedia, fallback bypass Cloudflare dilewati.')
 try:
     import dns.resolver
     HAS_DNSPYTHON = True
@@ -91,105 +75,11 @@ def is_cloudflare_challenge(resp_or_html):
         return True
     return False
 
-def detect_installed_chrome_major_version():
-    candidates = []
-    if sys.platform.startswith('win'):
-        try:
-            import winreg
-            for hive, path in [(winreg.HKEY_CURRENT_USER, 'Software\\Google\\Chrome\\BLBeacon'), (winreg.HKEY_LOCAL_MACHINE, 'Software\\Google\\Chrome\\BLBeacon')]:
-                try:
-                    key = winreg.OpenKey(hive, path)
-                    version, _ = winreg.QueryValueEx(key, 'version')
-                    candidates.append(version)
-                except FileNotFoundError:
-                    continue
-        except Exception:
-            pass
-    if not candidates:
-        for cmd in (['google-chrome', '--version'], ['chrome', '--version'], ['chromium', '--version'], ['chromium-browser', '--version']):
-            try:
-                out = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-                if out.stdout:
-                    candidates.append(out.stdout.strip())
-            except Exception:
-                continue
-    for text in candidates:
-        match = re.search('(\\d+)\\.\\d+\\.\\d+\\.\\d+', text)
-        if match:
-            return int(match.group(1))
-    return None
-
-def fetch_with_undetected_chromedriver(url, log_fn, timeout=30, max_wait=25, wait_for_contact=True):
-    if not HAS_UC:
-        log_fn('  [!] undetected-chromedriver belum terinstall, fallback dilewati.')
-        log_fn('      Install dengan: pip install undetected-chromedriver')
-        return (None, 'undetected-chromedriver tidak tersedia')
-    driver = None
-    try:
-        options = uc.ChromeOptions()
-        options.add_argument('--headless=new')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920,1080')
-        chrome_major = detect_installed_chrome_major_version()
-        if chrome_major:
-            log_fn(f'  [i] Terdeteksi Chrome versi {chrome_major}, menyesuaikan driver...')
-            driver = uc.Chrome(options=options, version_main=chrome_major)
-        else:
-            driver = uc.Chrome(options=options)
-        driver.set_page_load_timeout(timeout)
-        driver.get(url)
-        waited = 0
-        while waited < max_wait:
-            time.sleep(1)
-            waited += 1
-            title = (driver.title or '').lower()
-            html_snapshot = driver.page_source
-            still_challenge = is_cloudflare_challenge(html_snapshot) or 'just a moment' in title
-            if not still_challenge:
-                log_fn(f'  [i] Challenge kelar setelah ~{waited} detik.')
-                break
-        else:
-            log_fn(f'  [!] Setelah {max_wait} detik, halaman masih terlihat seperti challenge page.')
-        if wait_for_contact:
-            try:
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import WebDriverWait
-                try:
-                    WebDriverWait(driver, 10).until(lambda d: d.find_elements(By.CSS_SELECTOR, "a[href^='tel:'], a[href^='mailto:'], footer"))
-                    log_fn('  [i] Elemen kontak/footer terdeteksi di DOM.')
-                except Exception:
-                    log_fn('  [i] Tidak ada elemen kontak/footer eksplisit dalam 10 detik, lanjut scroll manual.')
-                driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
-                time.sleep(2)
-            except ImportError:
-                log_fn("  [i] Package 'selenium' tidak lengkap, lewati tunggu elemen kontak eksplisit.")
-        html_parts = [driver.page_source]
-        try:
-            from selenium.webdriver.common.by import By
-            iframes = driver.find_elements(By.TAG_NAME, 'iframe')
-            for frame in iframes:
-                try:
-                    driver.switch_to.frame(frame)
-                    html_parts.append(driver.page_source)
-                    driver.switch_to.default_content()
-                except Exception:
-                    driver.switch_to.default_content()
-                    continue
-            if iframes:
-                log_fn(f'  [i] Menggabungkan konten dari {len(iframes)} iframe untuk ekstraksi kontak.')
-        except Exception:
-            pass
-        html = '\n'.join(html_parts)
-        return (html, None)
-    except Exception as e:
-        return (None, str(e))
-    finally:
-        if driver:
-            try:
-                driver.quit()
-            except Exception:
-                pass
+def fetch_with_cloudflare_bypass(url, log_fn, session_id=None):
+    html, cookies, user_agent, fs_headers, fs_err = fetch_via_flaresolverr_with_retry(url, log_fn, is_cloudflare_challenge, session_id=session_id, attempts=3)
+    if html:
+        return (html, fs_headers, None)
+    return (None, {}, f'FlareSolverr: {fs_err}')
 
 def fetch(url):
     try:
@@ -481,6 +371,20 @@ def detect_technologies_wappalyzer(url, resp, log_fn):
         log_fn(f'  [!] Wappalyzer gagal menganalisis {url} -> {e}')
     return found
 
+def detect_technologies_wappalyzer_from_html(url, html_text, headers_dict, log_fn):
+    found = {}
+    if not HAS_WAPPALYZER:
+        return found
+    try:
+        webpage = WebPage(url, html_text, headers_dict or {})
+        techs_with_versions = WAPPALYZER.analyze_with_versions(webpage)
+        for tech_name, tech_info in techs_with_versions.items():
+            versions = tech_info.get('versions', []) if isinstance(tech_info, dict) else []
+            found[tech_name] = versions
+    except Exception as e:
+        log_fn(f'  [!] Wappalyzer (dari HTML mentah) gagal menganalisis {url} -> {e}')
+    return found
+
 def nmap_scan(domain):
     if not HAS_NMAP:
         return (None, 'nmap tidak ditemukan di sistem (pastikan sudah terinstall dan ada di PATH)')
@@ -598,26 +502,28 @@ def recon_single_target(base_url, log_fn):
                 target_dict[name] = set(versions)
             else:
                 target_dict[name].update(versions)
+    domain_for_session = urlparse(base_url).netloc.replace('.', '_').replace(':', '_')
+    fs_session_id = create_flaresolverr_session(log_fn, session_id=f'recon_{domain_for_session}')
     log_fn(f'\n=== Recon target: {base_url} ===')
     log_fn('--- Tahap 1: Fetch halaman utama ---')
     resp, soup, err, ssl_warning = fetch(base_url)
-    status_blocked = bool(resp) and resp.status_code in (401, 403, 429, 503)
-    cf_detected = is_cloudflare_challenge(resp) if resp else False
-    need_uc_fallback = not resp or cf_detected or status_blocked
-    if need_uc_fallback:
+    status_blocked = resp is not None and resp.status_code in (401, 403, 429, 503)
+    cf_detected = is_cloudflare_challenge(resp) if resp is not None else False
+    need_bypass_fallback = resp is None or cf_detected or status_blocked
+    if need_bypass_fallback:
         if cf_detected:
-            log_fn('  [!] Terdeteksi halaman Cloudflare challenge, mencoba fallback undetected-chromedriver...')
+            log_fn('  [!] Terdeteksi halaman Cloudflare challenge, mencoba bypass via FlareSolverr...')
         elif status_blocked:
-            log_fn(f'  [!] Diblokir dengan status {resp.status_code}, mencoba fallback undetected-chromedriver...')
+            log_fn(f'  [!] Diblokir dengan status {resp.status_code}, mencoba bypass via FlareSolverr...')
         else:
             log_fn(f'  [!] Gagal mengakses {base_url} -> {err}')
-            log_fn('  [*] Mencoba fallback undetected-chromedriver (siapa tahu diblokir Cloudflare)...')
-        uc_html, uc_err = fetch_with_undetected_chromedriver(base_url, log_fn)
-        if uc_html:
-            log_fn('  [+] Berhasil mengakses lewat undetected-chromedriver (bypass Cloudflare).')
-            result['errors'].append('Halaman utama diakses via fallback undetected-chromedriver (Cloudflare bypass)')
-            soup = BeautifulSoup(uc_html, 'html.parser')
-            emails, phones = extract_contacts(soup, uc_html)
+            log_fn('  [*] Mencoba bypass via FlareSolverr, siapa tahu diblokir Cloudflare...')
+        bypass_html, bypass_headers, bypass_err = fetch_with_cloudflare_bypass(base_url, log_fn, session_id=fs_session_id)
+        if bypass_html:
+            log_fn('  [+] Berhasil mengakses lewat bypass Cloudflare.')
+            result['errors'].append('Halaman utama diakses via fallback bypass Cloudflare (FlareSolverr)')
+            soup = BeautifulSoup(bypass_html, 'html.parser')
+            emails, phones = extract_contacts(soup, bypass_html)
             all_emails.update(emails)
             all_phones.update(phones)
             result['pages_scanned'].append(base_url)
@@ -625,20 +531,20 @@ def recon_single_target(base_url, log_fn):
                 log_fn(f'  [+] Email ditemukan (via bypass): {', '.join(sorted(emails))}')
             if phones:
                 log_fn(f'  [+] Telepon ditemukan (via bypass): {', '.join(sorted(phones))}')
-            if resp:
-                tech = detect_technologies_wappalyzer(base_url, resp, log_fn)
-                merge_tech(all_tech, tech)
-            extra_tech = detect_technologies_from_html(uc_html)
+            headers_dict = bypass_headers or (dict(resp.headers) if resp is not None else {})
+            tech = detect_technologies_wappalyzer_from_html(base_url, bypass_html, headers_dict, log_fn)
+            merge_tech(all_tech, tech)
+            extra_tech = detect_technologies_from_html(bypass_html)
             if extra_tech:
                 merge_tech(all_tech, {name: [] for name in extra_tech})
             if all_tech:
                 log_fn(f'  [+] Teknologi terdeteksi: {format_tech_for_log(all_tech)}')
         else:
-            msg = f'Gagal mengakses {base_url} (termasuk lewat fallback Cloudflare bypass) -> {uc_err or err}'
+            msg = f'Gagal mengakses {base_url} (termasuk lewat bypass FlareSolverr dengan retry) -> {bypass_err or err}'
             log_fn(f'  [!] {msg}')
             result['errors'].append(msg)
-            if not resp:
-                return result
+            destroy_flaresolverr_session(log_fn, session_id=fs_session_id)
+            return result
     else:
         if ssl_warning:
             log_fn(f'  [!!] TEMUAN KEAMANAN: {ssl_warning}')
@@ -660,24 +566,25 @@ def recon_single_target(base_url, log_fn):
     for path_url in internal_paths:
         log_fn(f'[*] Mengecek: {path_url}')
         p_resp, p_soup, p_err, p_ssl_warning = fetch(path_url)
-        p_status_blocked = bool(p_resp) and p_resp.status_code in (401, 403, 429, 503)
-        p_cf_detected = is_cloudflare_challenge(p_resp) if p_resp else False
-        if not p_resp or p_cf_detected or p_status_blocked:
+        p_status_blocked = p_resp is not None and p_resp.status_code in (401, 403, 429, 503)
+        p_cf_detected = is_cloudflare_challenge(p_resp) if p_resp is not None else False
+        if p_resp is None or p_cf_detected or p_status_blocked:
             if p_cf_detected:
-                log_fn('  [!] Terdeteksi Cloudflare challenge, mencoba fallback undetected-chromedriver...')
+                log_fn('  [!] Terdeteksi Cloudflare challenge, mencoba bypass via FlareSolverr...')
             elif p_status_blocked:
-                log_fn(f'  [!] Diblokir dengan status {p_resp.status_code}, mencoba fallback undetected-chromedriver...')
+                log_fn(f'  [!] Diblokir dengan status {p_resp.status_code}, mencoba bypass...')
             else:
-                log_fn(f'  [!] Gagal mengakses {path_url} -> {p_err}, mencoba fallback undetected-chromedriver...')
-            p_uc_html, p_uc_err = fetch_with_undetected_chromedriver(path_url, log_fn)
-            if not p_uc_html:
-                log_fn(f'  [!] Fallback juga gagal -> {p_uc_err or p_err}')
+                log_fn(f'  [!] Gagal mengakses {path_url} -> {p_err}, mencoba bypass...')
+            p_bypass_html, p_bypass_headers, p_bypass_err = fetch_with_cloudflare_bypass(path_url, log_fn, session_id=fs_session_id)
+            if not p_bypass_html:
+                log_fn(f'  [!] Semua metode bypass gagal -> {p_bypass_err or p_err}')
                 continue
-            log_fn('  [+] Berhasil lewat fallback undetected-chromedriver (bypass Cloudflare).')
-            p_soup = BeautifulSoup(p_uc_html, 'html.parser')
-            p_emails, p_phones = extract_contacts(p_soup, p_uc_html)
-            p_tech = detect_technologies_wappalyzer(path_url, p_resp, log_fn) if p_resp else {}
-            p_extra_tech = detect_technologies_from_html(p_uc_html)
+            log_fn('  [+] Berhasil lewat bypass Cloudflare.')
+            p_soup = BeautifulSoup(p_bypass_html, 'html.parser')
+            p_emails, p_phones = extract_contacts(p_soup, p_bypass_html)
+            p_headers_dict = p_bypass_headers or (dict(p_resp.headers) if p_resp is not None else {})
+            p_tech = detect_technologies_wappalyzer_from_html(path_url, p_bypass_html, p_headers_dict, log_fn)
+            p_extra_tech = detect_technologies_from_html(p_bypass_html)
             if p_extra_tech:
                 for name in p_extra_tech:
                     p_tech.setdefault(name, [])
@@ -778,7 +685,8 @@ def recon_single_target(base_url, log_fn):
         log_fn(f'  [+] Cipher: {ssl_info['cipher']}')
         log_fn(f'  [+] Handshake TLS: {ssl_info['handshake_ms']} ms')
         log_fn(f'  [+] Sertifikat issuer: {ssl_info['cert_issuer']}')
-        log_fn(f'  [+] Sertifikat expired: {ssl_info['cert_not_after']}{(' (SUDAH EXPIRED)' if ssl_info['cert_expired'] else '')}')
+        expired_note = ' (SUDAH EXPIRED)' if ssl_info['cert_expired'] else ''
+        log_fn(f'  [+] Sertifikat expired: {ssl_info['cert_not_after']}{expired_note}')
         if ssl_info['cert_expired']:
             result['errors'].append(f'Sertifikat SSL sudah expired sejak {ssl_info['cert_not_after']}')
     result['ssl_tls'] = ssl_info
@@ -791,17 +699,21 @@ def recon_single_target(base_url, log_fn):
     result['emails'] = sorted(all_emails)
     result['phones'] = sorted(all_phones)
     result['technologies'] = [{'name': name, 'versions': sorted((v for v in versions if v))} for name, versions in sorted(all_tech.items())]
+    destroy_flaresolverr_session(log_fn, session_id=fs_session_id)
     return result
 
 def main():
     if len(sys.argv) < 2:
         print('Cara pakai:')
-        print('  python recon_website_final_v2.py daftar_url.txt')
+        print('  python recon_website_final.py daftar_url.txt')
         print('')
         print('  daftar_url.txt berisi satu URL per baris, contoh:')
         print('    https://target1.com')
         print('    target2.com')
         print('    # ini komentar, akan diabaikan')
+        print('')
+        print('  Pastikan FlareSolverr sudah jalan sebelum eksekusi:')
+        print('    docker run -d --name flaresolverr -p 8191:8191 -e LOG_LEVEL=info --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest')
         sys.exit(1)
     input_path = Path(sys.argv[1])
     if not input_path.exists():
