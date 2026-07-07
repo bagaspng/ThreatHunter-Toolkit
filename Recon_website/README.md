@@ -46,7 +46,6 @@ Buat file teks berisi daftar target, satu URL per baris:
 ```
 https://target1.com
 target2.com
-# ini komentar, akan diabaikan
 ```
 
 Lalu jalankan:
