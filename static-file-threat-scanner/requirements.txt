@@ -1,0 +1,6 @@
+pillow>=10.0.0
+pypdf>=3.0.0
+pyyaml>=6.0
+defusedxml>=0.7.1
+rich>=13.0.0
+pytest>=7.0.0

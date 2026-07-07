@@ -1,0 +1,46 @@
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Output and reports (ignore generated reports/logs, keep .gitkeep)
+output/reports/*
+output/logs/*
+!output/reports/.gitkeep
+!output/logs/.gitkeep
+
+# Malware / Untrusted sample folders and large sample files
+samples/**/*
+!samples/**/.gitkeep
+
+# Environment variables & Sensitive info
+.env
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Exclude Agent Guide / Internal prompts
+agent.md

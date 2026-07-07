@@ -1,0 +1,32 @@
+pdf:
+  suspicious_keywords:
+    - "/JavaScript"
+    - "/JS"
+    - "/OpenAction"
+    - "/AA"
+    - "/Launch"
+    - "/EmbeddedFile"
+    - "/Filespec"
+    - "/URI"
+
+svg:
+  suspicious_keywords:
+    - "<script"
+    - "onload="
+    - "onerror="
+    - "onclick="
+    - "javascript:"
+    - "foreignObject"
+    - "iframe"
+    - "object"
+    - "embed"
+
+apk_indicators:
+  - "AndroidManifest.xml"
+  - "classes.dex"
+  - "resources.arsc"
+  - "META-INF/"
+  - "SEND_SMS"
+  - "READ_SMS"
+  - "READ_CONTACTS"
+  - "ACCESS_FINE_LOCATION"

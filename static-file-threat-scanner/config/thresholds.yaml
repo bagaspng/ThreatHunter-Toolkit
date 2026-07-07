@@ -1,0 +1,22 @@
+risk_level:
+  clean_max: 29
+  suspicious_max: 59
+  malicious_min: 60
+
+score:
+  extension_mismatch: 25
+  embedded_zip_or_apk: 35
+  embedded_exe: 40
+  pdf_javascript: 15
+  pdf_open_action: 20
+  pdf_embedded_file: 25
+  svg_script: 25
+  svg_event_handler: 20
+  svg_javascript_uri: 25
+  url_found: 10
+  base64_long: 10
+  data_after_image_eof: 25
+  apk_manifest_found: 25
+  dex_found: 25
+  dangerous_android_permission: 20
+  high_entropy: 10
