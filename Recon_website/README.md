@@ -12,8 +12,8 @@ Script recon website (fetch halaman, deteksi teknologi, cari subdomain, cari ori
 
 1. Clone repo ini:
    ```bash
-   git clone <url-repo-ini>
-   cd <nama-folder-repo>
+   git clone https://github.com/bagaspng/ThreatHunter-Toolkit.git
+   cd Recon_website
    ```
 
 2. Buat virtual environment (opsional tapi disarankan):
