@@ -8,3 +8,5 @@ git+https://github.com/chorsley/python-Wappalyzer.git
 undetected-chromedriver
 selenium
 dnspython
+fastapi
+uvicorn
