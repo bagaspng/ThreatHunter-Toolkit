@@ -63,7 +63,7 @@ Opsi:
 Modul `packer.py` adalah jantung ketiga obfuscator HTML/CSS/JS. Ia mengubah
 sumber JavaScript apa pun menjadi **satu baris "rimba simbol"** yang men-decode
 dirinya sendiri saat runtime lalu mengeksekusinya. Seluruh identifier hanya
-berupa `$`/`_`, tanpa angka atau string yang terbaca.
+berupa underscore (dibedakan panjangnya), tanpa angka atau string yang terbaca.
 
 Alur tiap lapis:
 
@@ -88,8 +88,13 @@ Hal yang menyulitkan analisis statis:
 
 Bisa dilapis (`layers`), tetapi ekspansinya besar sehingga default 1 lapis.
 
-Obfuscator Python (`py_obfuscator.py`) memakai ide serupa (rolling cipher +
-nama tersembunyi + self-decode satu baris) — lihat bab 4.4 dan 5.
+Setiap `pack()` menjalankan **self-check build-time**: skema decode-nya di-*replay*
+di Python dan wajib mereproduksi sumber; kalau tidak cocok proses dibatalkan
+(menangkap bug encode tanpa perlu Node). Karena CSS/JS/HTML memakai packer,
+ketiganya otomatis tervalidasi.
+
+Obfuscator Python (`py_obfuscator.py`) memakai gaya sepadan tetapi khas Python
+(angka dari `co_argcount`, huruf dari `str()` builtin) — lihat bab 4.4 dan 5.
 
 ---
 
@@ -140,18 +145,22 @@ dengan input sebelum output dianggap sah.
 ### 4.4 Obfuscate Python
 Modul: `py_obfuscator.py`
 
-1. Source di-`zlib` compress, lalu `base64`.
-2. Hasilnya lewat **rolling cipher berumpan-balik** ke rentang printable
-   (33–126) sehingga blob tampil sebagai satu string "teks sampah".
-3. Dibungkus **satu baris** `lambda` (identifier hanya underscore) yang membalik
-   cipher → base64 → zlib → teks source → `exec(source, globals())`.
-4. Nama `exec`, `zlib`, `base64`, `b64decode`, `decompress`, `builtins` semua
-   dibangun via `chr(...)` sehingga tidak muncul sebagai literal (tidak bisa
-   di-`grep`).
+Meniru gaya `target_obf.py`: **satu baris "rimba simbol"** tanpa angka atau
+string yang terbaca, seluruh identifier hanya underscore.
 
-Default 2 lapis (satu baris di dalam satu baris). Berbasis teks source (bukan
-bytecode), jadi **portabel antar-versi Python** dan tidak terkunci ke CPython
-tertentu.
+1. **Angka tanpa digit** — dibangun dari `lambda.__code__.co_argcount` (lambda
+   0/1/2 argumen → 0/1/2), lalu dikombinasi `+`/`*`.
+2. **Huruf tanpa string literal** — tiap karakter di-`slice` dari `str()` builtin
+   (mis. `str(type)`, `str(int)`), sehingga nama `bytes`, `decode`, `exec`,
+   `builtins` dirakit tanpa literal (tidak bisa di-`grep`).
+3. **Payload** = source di-rolling-cipher lalu disimpan sebagai **deret angka**
+   (bukan string terbaca).
+4. Saat runtime: angka dibalik → `bytes(...)` → `.decode()` → `exec(source,
+   globals())`, diakses lewat `getattr`/`__import__`.
+
+Berbasis teks source (bukan bytecode) → **portabel antar-versi Python**. Default
+1 lapis (ekspansinya besar). Bergantung pada format `repr()` CPython. Saat build
+di-**self-check** juga: payload di-*replay* dan output di-`compile()`.
 
 Catatan: tetap bisa dibalik dengan menjalankan lalu menangkap hasil decode.
 Untuk proteksi nyata gunakan kompilasi native (Nuitka/Cython) atau PyArmor.
@@ -244,11 +253,10 @@ Obfuscator JavaScript (lihat alur 4.2).
 
 ### `py_obfuscator.py`
 Obfuscator Python (lihat alur 4.4).
-- `obfuscate_python(source, layers=2)` — fungsi utama; kembalikan satu baris
-  Python self-decoding.
-- Internal: `_wrap_once` (satu lapis: zlib+base64+rolling cipher), `_name`
-  (bangun string nama via `chr`), `_blob` (rangkai payload printable jadi
-  literal).
+- `obfuscate_python(source, layers=1)` — fungsi utama; kembalikan satu baris
+  Python self-decoding bergaya rimba-simbol.
+- Internal: `_wrap_once` (satu lapis), `_num` (angka dari `co_argcount`), palette
+  `str()` (`_SOURCES`/`_SRC_EXPR`) untuk merakit huruf tanpa literal.
 
 ### `html_obfuscator.py`
 Obfuscator HTML (lihat alur 4.3).

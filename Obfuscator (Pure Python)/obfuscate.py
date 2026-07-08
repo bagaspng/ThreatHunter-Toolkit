@@ -73,10 +73,14 @@ def main(argv=None):
     map_path = None
     if ftype == "js":
         result = js_obfuscator.obfuscate_js(content, "high")
+        print("[verify] OK: self-check round-trip packer lolos", file=sys.stderr)
     elif ftype == "py":
         result = py_obfuscator.obfuscate_python(content)
+        print("[verify] OK: payload decode + syntax output tervalidasi",
+              file=sys.stderr)
     elif ftype == "css":
         result, mapping = css_obfuscator.obfuscate_css(content)
+        print("[verify] OK: self-check round-trip packer lolos", file=sys.stderr)
         map_path = args.map_output
         if map_path is None and args.output:
             map_path = args.output + ".map.json"
