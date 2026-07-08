@@ -9,67 +9,45 @@ from modules import js_obfuscator
 from modules import css_obfuscator
 from modules import py_obfuscator
 
-def encode_menu():
-    options = [
-        "Base64", "Base32", "Hexadecimal", "Binary",
-        "URL Encoding", "Unicode Escape", "ASCII Encoding", "Kembali",
-    ]
-    actions = {
-        "1": encoder.to_base64,
-        "2": encoder.to_base32,
-        "3": encoder.to_hex,
-        "4": encoder.to_binary,
-        "5": encoder.to_url,
-        "6": encoder.to_unicode_escape,
-        "7": encoder.to_ascii,
-    }
-
-    while True:
-        utils.print_menu("MENU ENCODE", options)
-        choice = input("\nPilih: ").strip()
-        if choice == "8":
-            return
-        if choice not in actions:
-            print("Pilihan tidak valid.")
-            utils.pause()
-            continue
-        try:
-            text = utils.get_text_source()
-            print("\nHasil:", actions[choice](text))
-        except Exception as e:
-            print("Error:", e)
+def _translate_all(title, methods):
+    utils.print_header(title)
+    try:
+        text = utils.get_input("Masukkan teks: ")
+    except ValueError:
+        print("Input kosong.")
         utils.pause()
+        return
+    print("\n=== HASIL ===")
+    for name, fn in methods:
+        try:
+            print(f"\n{name}:\n{fn(text)}")
+        except Exception as e:
+            print(f"\n{name}:\n[gagal] {e}")
+    utils.pause()
+
+def encode_menu():
+    methods = [
+        ("Base64", encoder.to_base64),
+        ("Base32", encoder.to_base32),
+        ("Hexadecimal", encoder.to_hex),
+        ("Binary", encoder.to_binary),
+        ("URL Encoding", encoder.to_url),
+        ("Unicode Escape", encoder.to_unicode_escape),
+        ("ASCII Encoding", encoder.to_ascii),
+    ]
+    _translate_all("MENU ENCODE", methods)
 
 def decode_menu():
-    options = [
-        "Base64", "Base32", "Hexadecimal", "Binary",
-        "URL Decode", "Unicode Escape", "ASCII Decode", "Kembali",
+    methods = [
+        ("Base64", decoder.from_base64),
+        ("Base32", decoder.from_base32),
+        ("Hexadecimal", decoder.from_hex),
+        ("Binary", decoder.from_binary),
+        ("URL Decode", decoder.from_url),
+        ("Unicode Escape", decoder.from_unicode_escape),
+        ("ASCII Decode", decoder.from_ascii),
     ]
-    actions = {
-        "1": decoder.from_base64,
-        "2": decoder.from_base32,
-        "3": decoder.from_hex,
-        "4": decoder.from_binary,
-        "5": decoder.from_url,
-        "6": decoder.from_unicode_escape,
-        "7": decoder.from_ascii,
-    }
-
-    while True:
-        utils.print_menu("MENU DECODE", options)
-        choice = input("\nPilih: ").strip()
-        if choice == "8":
-            return
-        if choice not in actions:
-            print("Pilihan tidak valid.")
-            utils.pause()
-            continue
-        try:
-            text = utils.get_text_source()
-            print("\nHasil:", actions[choice](text))
-        except Exception as e:
-            print("Error:", e)
-        utils.pause()
+    _translate_all("MENU DECODE", methods)
 
 def hash_menu():
     options = ["MD5", "SHA1", "SHA256", "SHA512", "CRC32", "Kembali"]
@@ -80,7 +58,6 @@ def hash_menu():
         "4": hasher.sha512,
         "5": hasher.crc32,
     }
-
     while True:
         utils.print_menu("MENU HASH", options)
         choice = input("\nPilih: ").strip()
@@ -112,7 +89,6 @@ def detect_menu():
 
 def batch_menu():
     options = ["Encode Batch", "Decode Batch", "Kembali"]
-
     while True:
         utils.print_menu("PEMROSESAN BATCH", options)
         choice = input("\nPilih: ").strip()
@@ -122,7 +98,6 @@ def batch_menu():
             print("Pilihan tidak valid.")
             utils.pause()
             continue
-
         methods = ["base64", "base32", "hex", "binary", "url", "ascii"]
         try:
             print("\nSumber input:")
@@ -136,19 +111,16 @@ def batch_menu():
                 lines = utils.get_multiline(
                     "Masukkan baris (baris kosong untuk selesai):"
                 )
-
             print("\nMetode:", ", ".join(methods))
             method = utils.get_input("Pilih metode: ").strip().lower()
             if method not in methods:
                 print("Error: Metode tidak dikenal")
                 utils.pause()
                 continue
-
             if choice == "1":
                 results = batch_processor.batch_encode(lines, method)
             else:
                 results = batch_processor.batch_decode(lines, method)
-
             print()
             for original, output in results:
                 print(f"{original} → {output}")
@@ -157,8 +129,14 @@ def batch_menu():
         utils.pause()
 
 def _read_code_source():
-    filename = input("\nMasukkan nama file: ").strip()
-    return file_handler.read_file(filename)
+    print("\nSumber kode:")
+    print("1. Tempel (paste) di terminal")
+    print("2. Baca dari file")
+    source = input("Pilih: ").strip()
+    if source == "2":
+        filename = input("Masukkan nama file: ").strip()
+        return file_handler.read_file(filename)
+    return utils.get_pasted_code()
 
 def _write_or_show(result, extra=None):
     output = input("\nSimpan ke file? (kosongkan untuk tampilkan): ").strip()
@@ -176,7 +154,6 @@ def file_obfuscate_menu():
         "Obfuscate HTML", "Obfuscate JavaScript",
         "Obfuscate CSS", "Obfuscate Python", "Kembali",
     ]
-
     while True:
         utils.print_menu("OBFUSCATE FILE (HTML/CSS/JS/PY)", options)
         choice = input("\nPilih: ").strip()
@@ -186,21 +163,11 @@ def file_obfuscate_menu():
             print("Pilihan tidak valid.")
             utils.pause()
             continue
-
-        html_obfuscator = None
         if choice == "1":
-            try:
-                from modules import html_obfuscator
-                from modules import verifier
-            except ImportError:
-                print("\nFitur HTML butuh 'beautifulsoup4' dan 'lxml'.")
-                print("Install dulu: pip install -r requirements.txt")
-                utils.pause()
-                continue
-
+            from modules import html_obfuscator
+            from modules import verifier
         try:
             code = _read_code_source()
-
             if choice == "1":
                 result, rendered = html_obfuscator.build(code)
                 ok, vmsg = verifier.verify(result, rendered)
@@ -231,7 +198,6 @@ def main():
         "5": batch_menu,
         "6": file_obfuscate_menu,
     }
-
     while True:
         utils.print_header("PYTHON ENCODER SECURITY TOOLKIT")
         print("\n1. Encode")
@@ -242,7 +208,6 @@ def main():
         print("6. Obfuscate File (HTML/CSS/JS/PY)")
         print("7. Keluar")
         choice = input("\nPilih: ").strip()
-
         if choice == "7":
             print("\nSampai jumpa!")
             break

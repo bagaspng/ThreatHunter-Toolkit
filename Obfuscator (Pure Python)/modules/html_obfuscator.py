@@ -1,31 +1,15 @@
 import json
 
-from bs4 import BeautifulSoup
-
-from modules import js_obfuscator
 from modules import substitution_cipher
 from modules import zwsp_delimiter
 from modules import anti_tamper
-
-def _obfuscate_inline_scripts(html):
-    soup = BeautifulSoup(html, "lxml")
-    result = html
-    for tag in soup.find_all("script"):
-        if tag.get("src"):
-            continue
-        code = tag.string if tag.string is not None else tag.get_text()
-        if not code or not code.strip():
-            continue
-        obf = js_obfuscator.obfuscate_js(code, "high")
-        result = result.replace(code, obf, 1)
-    return result
+from modules import packer
 
 def _build_loader(combined, expected_checksum):
     ck = "_ck"
     dec = "_dec"
     split = "_split"
     payload_literal = json.dumps(combined)
-
     return (
         "(function(){"
         + anti_tamper.js_checksum_function(ck)
@@ -51,19 +35,17 @@ def _build_loader(combined, expected_checksum):
 
 def _wrap_page(loader_js):
     return (
-        "<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"></head>\n"
-        "<body>\n<script>\n" + loader_js + "\n</script>\n</body>\n</html>\n"
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head>"
+        "<body><script>" + loader_js + "</script></body></html>"
     )
 
 def build(html):
-    rendered = _obfuscate_inline_scripts(html)
-
+    rendered = html
     payload_b64, inverse_b64 = substitution_cipher.encode(rendered)
     combined = zwsp_delimiter.combine([payload_b64, inverse_b64])
     expected_checksum = anti_tamper.checksum(combined)
-
     inner_loader = _build_loader(combined, expected_checksum)
-    outer_loader = js_obfuscator.obfuscate_js(inner_loader, "high")
+    outer_loader = packer.pack(inner_loader)
     return _wrap_page(outer_loader), rendered
 
 def obfuscate_html(html):

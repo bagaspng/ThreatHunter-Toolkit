@@ -31,12 +31,31 @@ def get_multiline(prompt="Masukkan baris (baris kosong untuk selesai):"):
         raise ValueError("Input kosong")
     return lines
 
+def get_pasted_code(end_marker="EOF"):
+    print(
+        f"\nTempel (paste) kode di bawah ini.\n"
+        f"Setelah selesai, ketik '{end_marker}' di baris baru lalu Enter "
+        f"(atau tekan Ctrl+D):"
+    )
+    lines = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if line.strip() == end_marker:
+            break
+        lines.append(line)
+    code = "\n".join(lines)
+    if not code.strip():
+        raise ValueError("Input kosong")
+    return code
+
 def get_text_source():
     print("\nSumber input:")
     print("1. Input Teks Manual")
     print("2. Baca Dari File")
     choice = input("Pilih: ").strip()
-
     if choice == "2":
         filename = input("Masukkan nama file: ").strip()
         data = file_handler.read_file(filename)
