@@ -5,12 +5,8 @@ tanpa Node.js.
 
 ## Instalasi
 
-Butuh **Python 3.9+**.
-
-```bash
-# Dependensi Python (beautifulsoup4 + lxml)
-pip install -r requirements.txt
-```
+Butuh **Python 3.9+**. Tidak ada dependency eksternal — 100% standard library,
+jadi tinggal jalankan (tanpa `pip install`).
 
 ## Pemakaian
 

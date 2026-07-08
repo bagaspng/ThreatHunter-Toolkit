@@ -54,26 +54,21 @@ def _tokenize(code):
     buf = []
     i = 0
     n = len(code)
-
     def flush():
         if buf:
             tokens.append(("code", "".join(buf)))
             buf.clear()
-
     def last_significant():
         for ch in reversed(buf):
             if not ch.isspace():
                 return ch
         return None
-
     def trailing_word():
         m = re.search(r"([A-Za-z_$][\w$]*)\s*$", "".join(buf[-16:]))
         return m.group(1) if m else ""
-
     while i < n:
         c = code[i]
         two = code[i:i + 2]
-
         if two == "//":
             flush()
             j = code.find("\n", i)
@@ -152,7 +147,6 @@ def _tokenize(code):
         else:
             buf.append(c)
             i += 1
-
     flush()
     return tokens
 
@@ -209,7 +203,6 @@ def _encode_strings(tokens, helper):
     for idx, (typ, txt) in enumerate(tokens):
         if typ != "string":
             continue
-
         if _next_char(tokens, idx) == ":":
             continue
         value = _js_string_value(txt)
@@ -288,30 +281,23 @@ def _control_flow_noise(used):
     return ("if((function(){{return ![];}})()){{var {a}=0;"
             "switch({a}){{case 1:{a}++;break;default:break;}}}}").format(a=a)
 
-def obfuscate_js(code, level="medium", pack=True, layers=2):
+def obfuscate_js(code, level="medium", pack=True):
     used = set()
     helper = _rand_name(used)
     tokens = _tokenize(code)
-
     if level in ("medium", "high"):
         tokens = _rename(tokens, used)
-
     used_helper = _encode_strings(tokens, helper)
-
     if level == "high":
         tokens = _inject_dead(tokens, used, count=6)
-
     body = "".join(t for _, t in tokens)
-
     if level == "high":
         noise = "\n".join(_control_flow_noise(used) for _ in range(2))
         body = noise + "\n" + body
-
     if used_helper:
         prefix = ("function %s(a){return String.fromCharCode.apply(null,a);}\n"
                   % helper)
         body = prefix + body
-
-    if pack:
-        return packer.pack(body, layers=layers)
-    return body
+    if not pack:
+        return body
+    return packer.pack(body)

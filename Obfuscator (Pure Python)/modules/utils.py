@@ -56,7 +56,6 @@ def get_text_source():
     print("1. Input Teks Manual")
     print("2. Baca Dari File")
     choice = input("Pilih: ").strip()
-
     if choice == "2":
         filename = input("Masukkan nama file: ").strip()
         data = file_handler.read_file(filename)

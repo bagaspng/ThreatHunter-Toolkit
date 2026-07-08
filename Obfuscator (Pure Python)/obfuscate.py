@@ -37,18 +37,6 @@ def read_input(args):
               file=sys.stderr)
     return sys.stdin.read()
 
-def check_dependencies(need_html=False):
-    if need_html:
-        try:
-            import bs4
-            import lxml
-        except ImportError:
-            return False, (
-                "Mode HTML butuh 'beautifulsoup4' + 'lxml'.\n"
-                "Install: pip install -r requirements.txt"
-            )
-    return True, "OK"
-
 def build_parser():
     p = argparse.ArgumentParser(
         prog="obfuscate.py",
@@ -68,7 +56,6 @@ def build_parser():
 def _run_html(content, args):
     from modules import html_obfuscator
     from modules import verifier
-
     final, rendered = html_obfuscator.build(content)
     if not args.no_verify:
         ok, msg = verifier.verify(final, rendered)
@@ -82,15 +69,7 @@ def main(argv=None):
     if not content.strip():
         print("Error: input kosong.", file=sys.stderr)
         return 1
-
     ftype = detect_type(args.input, args.type, content)
-
-    if ftype == "html":
-        ok, msg = check_dependencies(need_html=True)
-        if not ok:
-            print("Dependency belum lengkap:\n" + msg, file=sys.stderr)
-            return 2
-
     map_path = None
     if ftype == "js":
         result = js_obfuscator.obfuscate_js(content, "high")
@@ -110,7 +89,6 @@ def main(argv=None):
                   file=sys.stderr)
     else:
         result = _run_html(content, args)
-
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result)

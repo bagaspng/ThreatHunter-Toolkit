@@ -58,7 +58,6 @@ def hash_menu():
         "4": hasher.sha512,
         "5": hasher.crc32,
     }
-
     while True:
         utils.print_menu("MENU HASH", options)
         choice = input("\nPilih: ").strip()
@@ -90,7 +89,6 @@ def detect_menu():
 
 def batch_menu():
     options = ["Encode Batch", "Decode Batch", "Kembali"]
-
     while True:
         utils.print_menu("PEMROSESAN BATCH", options)
         choice = input("\nPilih: ").strip()
@@ -100,7 +98,6 @@ def batch_menu():
             print("Pilihan tidak valid.")
             utils.pause()
             continue
-
         methods = ["base64", "base32", "hex", "binary", "url", "ascii"]
         try:
             print("\nSumber input:")
@@ -114,19 +111,16 @@ def batch_menu():
                 lines = utils.get_multiline(
                     "Masukkan baris (baris kosong untuk selesai):"
                 )
-
             print("\nMetode:", ", ".join(methods))
             method = utils.get_input("Pilih metode: ").strip().lower()
             if method not in methods:
                 print("Error: Metode tidak dikenal")
                 utils.pause()
                 continue
-
             if choice == "1":
                 results = batch_processor.batch_encode(lines, method)
             else:
                 results = batch_processor.batch_decode(lines, method)
-
             print()
             for original, output in results:
                 print(f"{original} → {output}")
@@ -160,7 +154,6 @@ def file_obfuscate_menu():
         "Obfuscate HTML", "Obfuscate JavaScript",
         "Obfuscate CSS", "Obfuscate Python", "Kembali",
     ]
-
     while True:
         utils.print_menu("OBFUSCATE FILE (HTML/CSS/JS/PY)", options)
         choice = input("\nPilih: ").strip()
@@ -170,21 +163,11 @@ def file_obfuscate_menu():
             print("Pilihan tidak valid.")
             utils.pause()
             continue
-
-        html_obfuscator = None
         if choice == "1":
-            try:
-                from modules import html_obfuscator
-                from modules import verifier
-            except ImportError:
-                print("\nFitur HTML butuh 'beautifulsoup4' dan 'lxml'.")
-                print("Install dulu: pip install -r requirements.txt")
-                utils.pause()
-                continue
-
+            from modules import html_obfuscator
+            from modules import verifier
         try:
             code = _read_code_source()
-
             if choice == "1":
                 result, rendered = html_obfuscator.build(code)
                 ok, vmsg = verifier.verify(result, rendered)
@@ -215,7 +198,6 @@ def main():
         "5": batch_menu,
         "6": file_obfuscate_menu,
     }
-
     while True:
         utils.print_header("PYTHON ENCODER SECURITY TOOLKIT")
         print("\n1. Encode")
@@ -226,7 +208,6 @@ def main():
         print("6. Obfuscate File (HTML/CSS/JS/PY)")
         print("7. Keluar")
         choice = input("\nPilih: ").strip()
-
         if choice == "7":
             print("\nSampai jumpa!")
             break

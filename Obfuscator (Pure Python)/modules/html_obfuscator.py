@@ -10,7 +10,6 @@ def _build_loader(combined, expected_checksum):
     dec = "_dec"
     split = "_split"
     payload_literal = json.dumps(combined)
-
     return (
         "(function(){"
         + anti_tamper.js_checksum_function(ck)
@@ -41,17 +40,12 @@ def _wrap_page(loader_js):
     )
 
 def build(html):
-    # Seluruh dokumen di-encode utuh sebagai payload; tidak ada pra-obfuscation
-    # inline script terpisah (semuanya ikut tersembunyi).
     rendered = html
-
     payload_b64, inverse_b64 = substitution_cipher.encode(rendered)
     combined = zwsp_delimiter.combine([payload_b64, inverse_b64])
     expected_checksum = anti_tamper.checksum(combined)
-
     inner_loader = _build_loader(combined, expected_checksum)
-    # Lapis luar: IIFE (function(){...}()) yang men-decode dirinya sendiri.
-    outer_loader = packer.pack(inner_loader, layers=2)
+    outer_loader = packer.pack(inner_loader)
     return _wrap_page(outer_loader), rendered
 
 def obfuscate_html(html):
