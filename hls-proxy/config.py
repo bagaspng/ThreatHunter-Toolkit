@@ -1,5 +1,9 @@
 STREAM_URL = (
-    "https://vault-05.uwucdn.top/stream/05/16/02bb9df81bc3d2e1ba8c332ae25dc03d5e821d7d7344beea86cd28e35d1d6d6b/uwu.m3u8"
+    "https://vault-01.uwucdn.top/stream/01/09/b5513e71f8df5bcc7b513b1157137cc14fef15899f278daa032478d87e36e9a1/uwu.m3u8"
 )
 
 REFERER = "https://kwik.cx/"
+
+# Server settings
+HOST = "127.0.0.1"
+PORT = 8000
