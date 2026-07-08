@@ -1,9 +1,3 @@
-"""
-Google Dorking Tool - ThreatHunter Toolkit
-Search for exposed documents containing sensitive data (NAMA, NIK, etc.)
-Output: JSON format
-"""
-
 import json
 import time
 import sys
@@ -22,7 +16,6 @@ except ImportError:
 
 
 class GoogleDorker:
-    """Google Dorking search tool"""
 
     def __init__(self, delay: float = 2.0):
         self.delay = delay
@@ -32,7 +25,6 @@ class GoogleDorker:
         }
 
     def build_query(self, site: str = None, keywords: list = None, filetype: str = "pdf") -> str:
-        """Build Google dork query string"""
         parts = []
 
         if site:
@@ -47,10 +39,6 @@ class GoogleDorker:
         return " ".join(parts)
 
     def search(self, query: str, max_results: int = 20) -> list:
-        """
-        Perform Google search and extract results
-        Returns list of dicts with judul, url, deskripsi
-        """
         self.results = []
         start = 0
 
@@ -64,37 +52,25 @@ class GoogleDorker:
                 print(f"Error fetching: {e}")
                 break
 
-            # Parse results
             results = self._parse_html(response.text)
             if not results:
                 break
 
             self.results.extend(results)
 
-            if len(results) < 10:  # No more results
+            if len(results) < 10:  # hasil kurang dari 10 berarti udah halaman terakhir
                 break
 
             start += 10
-            time.sleep(self.delay)  # Respectful delay
+            time.sleep(self.delay)  # jeda biar ga langsung diblok google
 
         return self.results[:max_results]
 
     def _parse_html(self, html: str) -> list:
-        """Parse Google search results from HTML"""
         results = []
-
-        # Find result blocks - Google uses various selectors
         import re
 
-        # Pattern for search results
-        patterns = [
-            # Pattern 1: Standard result
-            r'<div class="BNE6kD[^"]*">.*?<a href="([^"]+)".*?<h3[^>]*>([^<]+)</h3>.*?<div[^>]*class="VwiC3b[^"]*"[^>]*>([^<]+)</div>',
-            # Pattern 2: Another format
-            r'<div class="MjjYud[^"]*">.*?<a href="([^"]+)".*?<h3[^>]*>([^<]+)</h3>',
-        ]
-
-        # Simple regex-based parsing
+        # class google (BNE6kD/MjjYud) suka ganti-ganti, jadi regex-nya longgar
         result_blocks = re.findall(
             r'<div class="[^"]*BNE6kD[^"]*|'
             r'<div class="[^"]*MjjYud[^"]*'
@@ -106,10 +82,9 @@ class GoogleDorker:
         )
 
         for url, judul, deskripsi in result_blocks:
-            # Clean up
             judul = self._clean_text(judul)
             deskripsi = self._clean_text(deskripsi)
-            url = url.split('&')[0].split('?')[0]  # Clean URL
+            url = url.split('&')[0].split('?')[0]  # buang tracking param dari url
 
             if url and judul:
                 results.append({
@@ -121,30 +96,26 @@ class GoogleDorker:
         return results
 
     def _clean_text(self, text: str) -> str:
-        """Clean extracted text"""
         import re
-        # Remove HTML tags
-        text = re.sub(r'<[^>]+>', '', text)
-        # Remove extra whitespace
-        text = ' '.join(text.split())
-        # Decode HTML entities
+        text = re.sub(r'<[^>]+>', '', text)  # buang tag html
+        text = ' '.join(text.split())  # rapiin spasi berlebih
+        # balikin entity html ke karakter aslinya
         text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
         text = text.replace('&#39;', "'").replace('&quot;', '"')
         return text.strip()
 
     def save_json(self, filepath: str = None):
-        """Save results to JSON file with secure path and permissions"""
         if not filepath:
             filepath = "dorking_results.json"
 
-        # Resolve path and validate safe directory
+        # pastiin nulis di dalam folder kerja, jangan sampai kena path traversal
         output_path = Path(filepath).resolve()
         safe_dir = Path.cwd().resolve()
 
         if not str(output_path).startswith(str(safe_dir)):
             raise ValueError('Output path outside safe directory')
 
-        # Write with restrictive permissions (0o600)
+        # 0o600 = cuma owner yang bisa baca/tulis
         fd = os.open(str(output_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             json.dump(self.results, f, ensure_ascii=False, indent=2)

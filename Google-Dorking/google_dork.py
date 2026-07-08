@@ -1,8 +1,3 @@
-"""
-Google Dorking Tool - Interactive CLI
-Playwright-based with pagination support
-"""
-
 import json
 import asyncio
 import os
@@ -10,7 +5,7 @@ import sys
 import io
 from pathlib import Path
 
-# Fix Windows console encoding
+# tanpa ini emoji/karakter aneh bikin error di console windows
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
@@ -26,7 +21,6 @@ except ImportError:
 
 
 class GoogleDorkerInteractive:
-    """Google Dorking with interactive pagination"""
 
     def __init__(self, headless: bool = True, delay: float = 2.0):
         self.headless = headless
@@ -48,7 +42,7 @@ class GoogleDorkerInteractive:
         return " ".join(parts)
 
     async def init_browser(self):
-        """Initialize stealth browser"""
+        # browser mode stealth biar ga langsung dicap bot sama google
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
@@ -78,7 +72,7 @@ class GoogleDorkerInteractive:
             await self.playwright.stop()
 
     async def search_page(self, query: str, page_num: int) -> list:
-        """Search single page and return results"""
+        # google pakai param start buat pagination, tiap halaman lompat 10
         start = (page_num - 1) * 10
         url = f"https://www.google.com/search?q={query}&start={start}"
 
@@ -88,7 +82,7 @@ class GoogleDorkerInteractive:
             await self.page.goto(url, wait_until='networkidle', timeout=30000)
             await asyncio.sleep(self.delay)
 
-            # Check for captcha
+            # kalau google curiga, dia lempar captcha. berhenti aja
             if await self.page.query_selector('#recaptcha, form[action*="captcha"]'):
                 print("BLOCKED!")
                 return []
@@ -161,7 +155,7 @@ async def interactive_search():
     print("  GOOGLE DORKING TOOL - Interactive CLI")
     print("=" * 60)
 
-    # Interactive inputs
+    # tanya-tanya ke user dulu
     print("\n[1] Site Filter (e.g., go.id, or press Enter for all):")
     site = input("  > ").strip() or None
 
@@ -213,7 +207,6 @@ async def interactive_search():
     print("\n[8] Output file (default: dorking_results.json):")
     output_file = input("  > ").strip() or "dorking_results.json"
 
-    # Build query
     query = dorker.build_query(site=site, keywords=keywords, filetype=filetype)
 
     print("\n" + "=" * 60)
@@ -224,12 +217,11 @@ async def interactive_search():
     print(f"  Results  : ~{(max_page - min_page + 1) * 10} max")
     print("=" * 60)
 
-    # Initialize browser
     print("\nInitializing browser...")
     await dorker.init_browser()
 
     try:
-        # Search each page
+        # gilir tiap halaman dari min sampai max
         all_results = []
         for page_num in range(min_page, max_page + 1):
             results = await dorker.search_page(query, page_num)
@@ -238,7 +230,6 @@ async def interactive_search():
 
         dorker.results = all_results
 
-        # Display results
         print("\n" + "=" * 60)
         print(f"  FOUND {len(all_results)} TOTAL RESULTS")
         print("=" * 60)
@@ -254,7 +245,6 @@ async def interactive_search():
                 except Exception:
                     pass
 
-        # Save
         save_path = dorker.save_json(output_file, all_results=True)
         print(f"\n[Saved] {save_path}")
 

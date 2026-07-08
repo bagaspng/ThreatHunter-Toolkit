@@ -1,8 +1,3 @@
-"""
-Google Dorking Tool - SearchAPI.io Version
-Uses Google Search API via SearchAPI.io (no blocking)
-"""
-
 import json
 import sys
 import argparse
@@ -18,7 +13,6 @@ except ImportError:
 
 
 class GoogleDorkerSearchAPI:
-    """Google Dorking using SearchAPI.io"""
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.environ.get("SEARCHAPI_KEY")
@@ -37,9 +31,8 @@ class GoogleDorkerSearchAPI:
         return " ".join(parts)
 
     def search(self, query: str, max_results: int = 100) -> list:
-        """Search using SearchAPI.io Google Search"""
         self.results = []
-        num_results = min(max_results, 100)
+        num_results = min(max_results, 100)  # api ga kasih lebih dari 100 sekali call
 
         url = "https://www.searchapi.io/api/v1/search"
         params = {
@@ -54,7 +47,7 @@ class GoogleDorkerSearchAPI:
             response.raise_for_status()
             data = response.json()
 
-            # Parse organic results
+            # yang kita mau cuma hasil organik, sisanya (iklan/knowledge graph) skip
             organic_results = data.get("organic_results", [])
 
             for result in organic_results:
