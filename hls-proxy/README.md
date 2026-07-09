@@ -8,16 +8,19 @@ Streaming (HLS) content, plus a built-in hls.js player.
 
 ```text
 hls/
-├── app.py            # Flask routes: / (player), /playlist, /segment, /key
-├── main.py           # Entry point — configures logging and starts the server
-├── config.py         # Stream source URL, Referer, host/port
-├── playlist.py       # .m3u8 downloader and URL rewriter
-├── proxy.py          # Segment/key proxy with HTTP Range (206) support
-├── player.html       # Built-in hls.js player page (served at /)
+├── app.py              # Flask routes: / (player), /playlist, /segment, /key, /embed
+├── main.py             # Entry point — configures rotating logging and starts the server
+├── config.py           # Config loader (reads config.json dynamically)
+├── config.json.example # Template for user settings (never commit config.json)
+├── playlist.py         # .m3u8 playlist downloader and URL rewriter
+├── proxy.py            # Segment/key proxy with caching, single-flight & retry mechanisms
+├── player.html         # Built-in hls.js player dashboard (served at /)
+├── embed.html          # Minimal player for iframe embeds (served at /embed)
 ├── static/
-│   └── hls.min.js    # hls.js 1.5.17, served locally (no CDN needed)
-├── logs/proxy.log    # Rotating request log
-├── requirements.txt  # flask, curl-cffi
+│   └── hls.min.js      # hls.js v1.5.17, served locally (no CDN needed)
+├── logs/               # Log folder (ignored by git)
+├── cache_segments/     # Disk cache for downloaded HLS segments (ignored by git)
+├── requirements.txt    # dependencies (flask, curl-cffi)
 └── README.md
 ```
 
@@ -45,9 +48,9 @@ hls/
 
 2. **Playlist (`GET /playlist`)** — `playlist.py` fetches the original `.m3u8`
    via `curl_cffi` (Chrome TLS fingerprint + `Referer`), then rewrites:
-   * segment URLs → `/segment?url=...`
-   * `#EXT-X-KEY` / `#EXT-X-MAP` → `/key?url=...` / `/segment?url=...`
-   * nested playlists / media → `/playlist?url=...`
+   - segment URLs → `/segment?url=...`
+   - `#EXT-X-KEY` / `#EXT-X-MAP` → `/key?url=...` / `/segment?url=...`
+   - nested playlists / media → `/playlist?url=...`
 
 3. **Segment (`GET /segment`)** — fetches the segment from the CDN. If the browser
    sends a `Range` header it is **forwarded** to the CDN and the proxy replies with
@@ -59,6 +62,7 @@ hls/
 ## Installation & Running
 
 1. Create a virtualenv and install dependencies:
+
    ```bash
    python3 -m venv venv
    ./venv/bin/pip install -r requirements.txt
@@ -67,6 +71,7 @@ hls/
 2. Set the stream in `config.py` (`STREAM_URL`, `REFERER`).
 
 3. Start the server:
+
    ```bash
    ./venv/bin/python main.py
    ```
@@ -86,8 +91,8 @@ http://127.0.0.1:8000/?url=<m3u8-url>
 http://127.0.0.1:8000/?url=<m3u8-url>&referer=<referer-url>
 ```
 
-* `url` — the source `.m3u8`. Empty → falls back to `STREAM_URL` in `config.py`.
-* `referer` — Referer sent to the CDN. Empty → falls back to `REFERER` in `config.py`.
+- `url` — the source `.m3u8`. Empty → falls back to `STREAM_URL` in `config.py`.
+- `referer` — Referer sent to the CDN. Empty → falls back to `REFERER` in `config.py`.
 
 Both are threaded through the whole chain: the player loads `/playlist?url=…&referer=…`,
 and the rewriter embeds the same `referer` into every `/segment` and `/key` URL so the
