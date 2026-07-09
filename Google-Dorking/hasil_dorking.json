@@ -1,0 +1,58 @@
+[
+  {
+    "query": "site:go.id NAMA NIK filetype:pdf",
+    "total_results": 10,
+    "data": [
+      {
+        "judul": "NAMA/NIK",
+        "url": "https://disdukcapil.pandeglangkab.go.id/download/1777949079_cabe926aaaeb05ced21d.pdf",
+        "deskripsi": "NO. NAMA/NIK. ALAMAT. KETERANGAN. 1. IYAN HERIANDI / 1373012912700001. DUSUN LUAK MANI. 2. SALIANA / 1373014107370020. DUSUN LUAK MANI."
+      },
+      {
+        "judul": "NAMA/NIK",
+        "url": "https://ppid.kemendagri.go.id/storage/dokumen/zMy8TQDmWDKZblA71VAhriZLGz4cG2VNynacUPes.pdf",
+        "deskripsi": "NO. NAMA/NIK. ALAMAT. KETERANGAN. 1. IYAN HERIANDI / 1373012912700001. DUSUN LUAK MANI. 2. SALIANA / 1373014107370020. DUSUN LUAK MANI."
+      },
+      {
+        "judul": "NO NIK NAMA KET",
+        "url": "https://layanan-online-dukcapil.kukarkab.go.id/upload/doc_terbit/SMK_FARMASI_TENGGARONG-dikonversi.pdf",
+        "deskripsi": "NIK. NAMA. KET. 1. 640216******0003 DAYA AULIYA NUR KHASANAH. TERCETAK. 2. 640202******0005 LAILATUN NURHONIA. TERCETAK. 3. 640202******0003 FRIZKA AMELYA ..."
+      },
+      {
+        "judul": "no nama nik nomor kk umur desa kecamatan",
+        "url": "https://baitulmal.simeuluekab.go.id/media/2025.04/miskin_tahap_2_baru1.pdf",
+        "deskripsi": "NAMA. NIK. NOMOR KK. UMUR. DESA. KECAMATAN. 1. 2. 3. 4. 5. 6. 7. 1 KAYANI. 1109044107500087. 1109043006060007. 75. AIR PINANG. SIMEULUE TIMUR. 2 ANIDAR."
+      },
+      {
+        "judul": "NO. NOMOR KARTU NIK NAMA HUB. ...",
+        "url": "https://jdih.pacitankab.go.id/upload/17213/KEPBUP_NO_002_TAHUN_2024_-SALINAN-_LAMPIRAN_3.pdf",
+        "deskripsi": "NOMOR KARTU NIK NAMA HUB. KELUARGA TANGGAL LAHIR ALAMAT. SUNARTI ISTRI 01/03/1970. MISRATIN ISTRI 22/ /2019 SENDI. LAHIR ALAMAT DESA KECAMATAN FASKES. ISTRI 09 ..."
+      },
+      {
+        "judul": "Rekapitulasi_Pendaftar_Lulus_V...",
+        "url": "https://sulteng.kemenag.go.id/files/show/Rekapitulasi_Pendaftar_Lulus_Verifikasi_SSCN_2018_Kementerian_Agama_Provinsi_Sulawesi_Tengah.pdf",
+        "deskripsi": "27 Feb 1991 — NAMA. NIK. TANGGAL LAHIR. NO REGISTER. JABATAN. LOKASI KERJA. JENIS FORMASI. 171.314 REZA ANUGRAH. 737114270291****. 02/27/1991. 1870045601."
+      },
+      {
+        "judul": "No Nama Alamat Nik Keterangan 1 2 3 4 5",
+        "url": "https://jdihdokum.pacitankab.go.id/upload/15690/KEPBUP_NO_472_TAHUN_2023__LAMPIRAN_2.pdf",
+        "deskripsi": "No. Nama. Alamat. Nik. Keterangan. 1. 2. 3. 4. 5. 1255. Umi Nur Hidayati Rt 001 Rw 008 Dusun Wonorejo Desa Punjung Kecamatan. Kebonagung Kabupaten Pacitan."
+      },
+      {
+        "judul": "daftar nama-nama penerima bantuan langsung tunai (blt) ...",
+        "url": "https://ppid.kemendagri.go.id/storage/dokumen/AsbiMLzMU62QBRxlj9ukuZAsLF5mNSU4NcSqejm1.pdf",
+        "deskripsi": "NAMA. NIK. ALAMAT. KETERANGAN. 1. ERMA WARNIS. 1373047112620010 DS. DATA GALUNDI. 2. YULINAR. 1373047006600004 DS. DATA GALUNDI. 3. BIRUNA. 1373047112650008 DS."
+      },
+      {
+        "judul": "Nama",
+        "url": "https://api-desa-web-diskominfox10-v3.klaten.go.id/media/informasippid/20240813183230.pdf",
+        "deskripsi": "13 Aug 2024 — Nama. Nama. Nama. NIK. NIK. NIK. Nama. Nama. Nama. NIK. NIK. NIK. Nama. Nama. Nama. NIK. NIK. NIK. Nama. Nama. Nama. NIK. NIK. NIK. Nama. Nama."
+      },
+      {
+        "judul": "NO. NIK NAMA ALAMAT 1 3672045801990001 ...",
+        "url": "https://ppid.bandungkab.go.id/image/document/kecamatan-cileunyi-data-guru-ngaji-kecamatan-cileunyi-tahun-2022.pdf",
+        "deskripsi": "NO. NIK. NAMA. ALAMAT. 1 3672045801990001. USMAETI. Kp Sukasari RW 2 RT 2. 2 3602200507820002. ADE SUPRIHAT. Komp Cibiru Asri RW 17 RT 3. 3 3601052306810004."
+      }
+    ]
+  }
+]
