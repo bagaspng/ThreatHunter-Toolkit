@@ -7,7 +7,9 @@ library. Menyediakan dua kelompok fitur:
 2. **Obfuscator file** — menyamarkan berkas HTML, CSS, JavaScript, dan Python
    menjadi payload satu-baris yang men-decode dirinya sendiri saat dijalankan.
 
-Tidak butuh dependency eksternal — 100% Python standard library (tanpa Node.js).
+**Logika inti 100% Python standard library** (tanpa Node.js). Satu-satunya
+dependency eksternal adalah **Flask**, dan itu pun hanya untuk layer Web API
+opsional (`app.py`); menu terminal dan CLI tetap berjalan tanpa dependency.
 
 ---
 
@@ -19,13 +21,15 @@ Program menu berbasis terminal. Jalankan:
     python3 main.py
 
 Menu utama:
-1. Encode
-2. Decode
-3. Hashing
-4. Deteksi Encoding
-5. Batch Processing
-6. Obfuscate File (HTML/CSS/JS/PY)
-7. Keluar
+1. Encode & Decode
+2. Hashing
+3. Deteksi Encoding
+4. Batch Processing
+5. Obfuscate File (HTML/CSS/JS/PY)
+6. Keluar
+
+Menu **Encode & Decode** digabung: satu kali input teks langsung menampilkan
+hasil encode **dan** decode sekaligus.
 
 Untuk obfuscate, kode dapat ditempel langsung atau dibaca dari file, dan hasil
 dapat ditampilkan atau disimpan ke file (masuk ke folder `Result/`).
@@ -33,7 +37,7 @@ dapat ditampilkan atau disimpan ke file (masuk ke folder `Result/`).
 ### `obfuscate.py` — CLI non-interaktif
 Cocok untuk automasi / pipeline. Contoh:
 
-    python3 obfuscate.py -i Example/csstester.css -o Result/cssresult.css
+    python3 obfuscate.py -i Example/csstester.css -o Result/cssresult.css.js
     python3 obfuscate.py -i app.js -t js -o app.obf.js
     cat app.py | python3 obfuscate.py -t py -o app.obf.py
 
@@ -44,15 +48,44 @@ Opsi:
 - `--map-output`  : path JSON mapping nama class/id (khusus CSS).
 - `--no-verify`   : lewati verifikasi round-trip (khusus HTML).
 
+### `app.py` — Web API (Flask)
+Entry point ketiga: membungkus fungsi encode/decode/obfuscate sebagai HTTP API
+sekaligus menyajikan halaman web. Jalankan:
+
+    pip install flask          # sekali saja (lihat requirements.txt)
+    python3 app.py             # buka http://127.0.0.1:5000/
+
+Endpoint (detail di `README_api.md`):
+- `GET  /`               — halaman web (form).
+- `POST /api/translate`  — encode **dan** decode sekaligus dari satu input.
+- `POST /api/encode`     — encode ke semua metode.
+- `POST /api/decode`     — decode dari semua metode.
+- `POST /api/obfuscate`  — obfuscate kode (js/css/py/html); terima JSON atau upload file.
+
+Fitur halaman web: hasil encode/decode per-metode dengan **salin selektif** &
+**→ input** (chaining), **Live mode** (default aktif), penyembunyian metode
+decode gagal + toggle "tampilkan yang gagal", **unggah / seret file** & **unduh
+hasil** obfuscate, counter karakter/byte, tombol bersihkan, pintasan Ctrl/Cmd+Enter,
+indikator loading, notifikasi toast, favicon, dan tampilan responsif.
+HTML/CSS/JS halaman dipisah: `templates/index.html`, `static/style.css`,
+`static/app.js`. Logikanya tetap memakai modul di `modules/`.
+
 ---
 
 ## 2. Struktur Direktori
 
     Obfuscator (Pure Python)/
-    ├── main.py               # menu interaktif
+    ├── main.py               # menu interaktif (terminal)
     ├── obfuscate.py          # CLI non-interaktif
+    ├── app.py                # Web API + halaman web (Flask)
+    ├── requirements.txt      # dependency (flask; markdown untuk build PDF)
+    ├── templates/            # index.html (halaman web)
+    ├── static/               # style.css, app.js (tampilan & interaksi web)
     ├── Example/              # contoh input (css/html/js/py tester)
     ├── Result/               # folder output default (dibuat otomatis)
+    ├── DOKUMENTASI.md/.txt   # dokumen ini
+    ├── README_api.md         # dokumentasi endpoint API
+    ├── LAPORAN.md / .pdf     # laporan tugas
     └── modules/              # seluruh modul (lihat bab 5)
 
 ---
@@ -113,6 +146,11 @@ Modul: `css_obfuscator.py` → `packer.py`
 Output: satu baris JS. Saat dijalankan browser, CSS asli disuntik ke DOM.
 Mapping nama class dikembalikan terpisah (untuk `--map-output`).
 
+> **Penting:** hasil obfuscate CSS adalah **JavaScript**, bukan berkas `.css`.
+> Pakai di dalam `<script>`, bukan sebagai `<link rel="stylesheet">`. Karena itu,
+> di halaman web hasilnya diunduh sebagai **`obfuscated.css.js`**, dan di CLI
+> sebaiknya diberi ekstensi `.js` (mis. `-o Result/cssresult.css.js`).
+
 ### 4.2 Obfuscate JavaScript
 Modul: `js_obfuscator.py` → `packer.py`
 
@@ -133,13 +171,22 @@ Modul: `html_obfuscator.py` → `substitution_cipher`, `zwsp_delimiter`,
    tampak).
 3. Dihitung **checksum anti-tamper**; loader menolak berjalan bila payload
    diubah (charset atau checksum tidak cocok).
-4. Loader menyusun dokumen (`document.write`) lalu **membersihkan jejak**
-   (menghapus tag `<script>` dan komentar dari DOM).
+4. Loader menyusun dokumen (`document.write`) lalu **membersihkan jejak**:
+   menghapus semua tag `<script>` dan komentar dari DOM. Pembersihan bersifat
+   **tahan-async** — dijalankan pada event `load` (setelah script eksternal/CDN
+   yang *parser-blocking* dan script inline yang bergantung padanya selesai
+   berjalan) dan dipantau `MutationObserver` untuk script yang muncul belakangan.
+   Setiap script dihapus **setelah sempat dieksekusi**, jadi fungsi halaman tetap
+   utuh (mis. dashboard berbasis Chart.js tetap jalan, tanpa `<script>` tersisa).
 5. Loader dibungkus `pack()` dan ditempel dalam kerangka HTML minimal
    **satu baris**.
 
 Verifikasi round-trip otomatis (`verifier.py`) memastikan hasil decode identik
 dengan input sebelum output dianggap sah.
+
+> **Catatan keamanan:** menghapus `<script>` dari DOM bersifat **kosmetik** —
+> kode tetap dijalankan browser dan bisa dipulihkan lewat DevTools/Network. Lihat
+> bab 6.
 
 ### 4.4 Obfuscate Python
 Modul: `py_obfuscator.py`

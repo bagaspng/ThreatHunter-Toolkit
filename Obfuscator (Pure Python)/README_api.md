@@ -1,0 +1,146 @@
+# Web API — Obfuscator (Pure Python)
+
+`app.py` adalah **entry point ketiga** dari toolkit ini, melengkapi:
+
+| File | Bentuk | Untuk |
+|------|--------|-------|
+| `main.py` | Menu interaktif terminal | manusia |
+| `obfuscate.py` | CLI (stdin/stdout) | automasi/pipeline |
+| **`app.py`** | **Web API + halaman form** | akses lewat HTTP/browser |
+
+Semua logika tetap memakai modul di `modules/` — API hanya membungkusnya.
+
+---
+
+## Menjalankan
+
+```bash
+cd "Obfuscator (Pure Python)"
+./venv/bin/pip install -r requirements.txt   # sekali saja (flask)
+./venv/bin/python app.py
+```
+
+Server jalan di **http://127.0.0.1:5000/**. Buka di browser untuk memakai form,
+atau panggil endpoint langsung dengan `curl`/Postman.
+
+Berkas halaman web dipisah dari `app.py`:
+`templates/index.html` (struktur), `static/style.css` (tampilan),
+`static/app.js` (interaksi).
+
+---
+
+## Fitur Halaman Web
+
+- **Encode & Decode** per-metode dengan tombol **Salin** selektif tiap metode,
+  plus tombol **→ input** untuk mengirim hasil kembali ke input (chaining).
+- **Live mode** (default aktif) — hasil diperbarui otomatis saat mengetik.
+- Metode **decode yang gagal disembunyikan** secara default (label menampilkan
+  jumlah berhasil/gagal); ada toggle **"Tampilkan yang gagal"**.
+- **Obfuscate** dengan **unggah file** atau **seret & lepas (drag & drop)** file
+  (tipe auto dari ekstensi) dan **unduh hasil**.
+- **Counter** karakter/byte, tombol **Bersihkan**, dan pintasan **Ctrl/Cmd+Enter**.
+- Indikator **loading**, notifikasi **toast**, pesan **error** berstyle, dan
+  tampilan **responsif** (mobile).
+
+---
+
+## Daftar Endpoint
+
+### `GET /`
+Halaman web berisi form Encode/Decode dan Obfuscate. Mengembalikan HTML.
+
+### `POST /api/translate`
+Meng-encode **dan** decode sekaligus dari satu input (seperti *dencode*). Dipakai
+oleh form web: satu input, dua hasil langsung muncul.
+
+- **Input** (JSON): `{"text": "halo"}`
+- **Output**:
+  ```json
+  {
+    "input": "halo",
+    "encode": { "base64": { "ok": true, "value": "aGFsbw==" } },
+    "decode": { "base64": { "ok": false, "error": "..." } }
+  }
+  ```
+
+### `POST /api/encode`
+Meng-encode teks ke **semua** metode sekaligus.
+
+- **Input** (JSON): `{"text": "halo"}`
+- **Metode**: base64, base32, hex, binary, url, unicode, ascii
+- **Output**:
+  ```json
+  {
+    "input": "halo",
+    "results": {
+      "base64": { "ok": true, "value": "aGFsbw==" },
+      "hex":    { "ok": true, "value": "68616c6f" }
+    }
+  }
+  ```
+
+### `POST /api/decode`
+Kebalikan dari encode, dengan bentuk input/output yang sama. Metode yang tidak
+cocok dengan input ditandai `"ok": false` dan pesan error-nya, tanpa meng-crash.
+
+- **Input** (JSON): `{"text": "aGFsbw=="}`
+- **Output**: `results.base64 = { "ok": true, "value": "halo" }`
+
+### `POST /api/obfuscate`
+Meng-obfuscate kode. Mendukung tipe **js, css, py, html**.
+
+- **Input** (salah satu):
+  - JSON: `{"code": "print(1)", "type": "py"}`
+  - Upload file: field `file` (tipe otomatis dari ekstensi `.js/.css/.py/.html`)
+- **Output**: `{"type": "...", "result": "..."}` dengan tambahan:
+  - `css` → `mapping` (peta nama class/id lama → baru)
+  - `html` → `verify` (`{ok, message}` hasil cek round-trip)
+
+> **Catatan tipe `css`:** `result`-nya adalah **JavaScript** — sebuah *injector*
+> yang menyuntik CSS ke DOM saat dijalankan, **bukan** file `.css`. Jadi hasilnya
+> dipakai di dalam `<script>`, dan di halaman web diunduh sebagai
+> **`obfuscated.css.js`** (bukan `.css`). Tipe js/py/html diunduh sesuai
+> ekstensinya masing-masing.
+
+---
+
+## Contoh `curl`
+
+```bash
+# Encode + Decode sekaligus (satu input, dua hasil)
+curl -X POST http://127.0.0.1:5000/api/translate \
+  -H 'Content-Type: application/json' -d '{"text":"halo"}'
+
+# Encode
+curl -X POST http://127.0.0.1:5000/api/encode \
+  -H 'Content-Type: application/json' -d '{"text":"halo"}'
+
+# Decode
+curl -X POST http://127.0.0.1:5000/api/decode \
+  -H 'Content-Type: application/json' -d '{"text":"aGFsbw=="}'
+
+# Obfuscate via JSON
+curl -X POST http://127.0.0.1:5000/api/obfuscate \
+  -H 'Content-Type: application/json' -d '{"code":"print(1+1)","type":"py"}'
+
+# Obfuscate via upload file (tipe auto dari ekstensi)
+curl -X POST http://127.0.0.1:5000/api/obfuscate -F 'file=@Example/jstester.js'
+```
+
+---
+
+## Kode Status
+
+| Kode | Arti |
+|------|------|
+| `200` | Sukses |
+| `400` | Input salah / kosong (mis. `text` kosong, tipe tidak dikenal) |
+| `500` | Gagal saat proses obfuscate |
+
+---
+
+## Catatan
+
+- Tanpa autentikasi — ditujukan untuk pemakaian lokal (`127.0.0.1`).
+- Endpoint encode/decode menjalankan **semua** metode sekaligus, sejalan dengan
+  menu "Encode & Decode" gabungan di `main.py`.

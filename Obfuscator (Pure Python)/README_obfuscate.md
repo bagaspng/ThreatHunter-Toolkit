@@ -17,9 +17,13 @@ Mode file:
 ```bash
 python obfuscate.py -i page.html  -o page.obf.html
 python obfuscate.py -i app.js     -o app.obf.js
-python obfuscate.py -i style.css  -o style.obf.css
+python obfuscate.py -i style.css  -o style.obf.css.js   # CSS -> injector JS
 python obfuscate.py -i tool.py    -o tool.obf.py
 ```
+
+> **Catatan:** hasil obfuscate **CSS adalah JavaScript** (injector yang menyuntik
+> CSS ke DOM saat dijalankan), bukan berkas `.css`. Pakai di dalam `<script>` dan
+> simpan berekstensi `.js` (mis. `.css.js`).
 
 Mode stdin (tempel kode lalu tekan Ctrl+D):
 
@@ -43,6 +47,6 @@ Opsi:
 python main.py
 ```
 
-Pilih menu **6. Obfuscate File (HTML/CSS/JS/PY)**, lalu pilih HTML / JavaScript /
+Pilih menu **5. Obfuscate File (HTML/CSS/JS/PY)**, lalu pilih HTML / JavaScript /
 CSS / Python, dan masukkan nama file yang mau diobfuscate. Hasilnya tersimpan di
 dalam folder proyek ini.

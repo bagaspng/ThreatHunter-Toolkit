@@ -9,45 +9,46 @@ from modules import js_obfuscator
 from modules import css_obfuscator
 from modules import py_obfuscator
 
-def _translate_all(title, methods):
-    utils.print_header(title)
+ENCODE_METHODS = [
+    ("Base64", encoder.to_base64),
+    ("Base32", encoder.to_base32),
+    ("Hexadecimal", encoder.to_hex),
+    ("Binary", encoder.to_binary),
+    ("URL Encoding", encoder.to_url),
+    ("Unicode Escape", encoder.to_unicode_escape),
+    ("ASCII Encoding", encoder.to_ascii),
+]
+
+DECODE_METHODS = [
+    ("Base64", decoder.from_base64),
+    ("Base32", decoder.from_base32),
+    ("Hexadecimal", decoder.from_hex),
+    ("Binary", decoder.from_binary),
+    ("URL Decode", decoder.from_url),
+    ("Unicode Escape", decoder.from_unicode_escape),
+    ("ASCII Decode", decoder.from_ascii),
+]
+
+def _print_results(methods, text):
+    for name, fn in methods:
+        try:
+            print(f"\n{name}:\n{fn(text)}")
+        except Exception as e:
+            print(f"\n{name}:\n[gagal] {e}")
+
+def translate_menu():
+    utils.print_header("MENU ENCODE & DECODE")
     try:
         text = utils.get_input("Masukkan teks: ")
     except ValueError:
         print("Input kosong.")
         utils.pause()
         return
-    print("\n=== HASIL ===")
-    for name, fn in methods:
-        try:
-            print(f"\n{name}:\n{fn(text)}")
-        except Exception as e:
-            print(f"\n{name}:\n[gagal] {e}")
+    print("\n=== HASIL ENCODE ===")
+    _print_results(ENCODE_METHODS, text)
+    print("\n=== HASIL DECODE ===")
+    _print_results(DECODE_METHODS, text)
     utils.pause()
-
-def encode_menu():
-    methods = [
-        ("Base64", encoder.to_base64),
-        ("Base32", encoder.to_base32),
-        ("Hexadecimal", encoder.to_hex),
-        ("Binary", encoder.to_binary),
-        ("URL Encoding", encoder.to_url),
-        ("Unicode Escape", encoder.to_unicode_escape),
-        ("ASCII Encoding", encoder.to_ascii),
-    ]
-    _translate_all("MENU ENCODE", methods)
-
-def decode_menu():
-    methods = [
-        ("Base64", decoder.from_base64),
-        ("Base32", decoder.from_base32),
-        ("Hexadecimal", decoder.from_hex),
-        ("Binary", decoder.from_binary),
-        ("URL Decode", decoder.from_url),
-        ("Unicode Escape", decoder.from_unicode_escape),
-        ("ASCII Decode", decoder.from_ascii),
-    ]
-    _translate_all("MENU DECODE", methods)
 
 def hash_menu():
     options = ["MD5", "SHA1", "SHA256", "SHA512", "CRC32", "Kembali"]
@@ -180,6 +181,8 @@ def file_obfuscate_menu():
             elif choice == "3":
                 result, mapping = css_obfuscator.obfuscate_css(code)
                 print("\n[verify] OK self-check round-trip packer lolos")
+                print("[info] hasil CSS berupa JavaScript (injector) — pakai di "
+                      "dalam <script>, simpan sebagai .js (mis. .css.js), bukan .css")
                 import json
                 mapping_text = json.dumps(mapping, indent=2, ensure_ascii=False)
                 print("\nMapping class/id:\n" + mapping_text)
@@ -194,24 +197,22 @@ def file_obfuscate_menu():
 
 def main():
     menu_actions = {
-        "1": encode_menu,
-        "2": decode_menu,
-        "3": hash_menu,
-        "4": detect_menu,
-        "5": batch_menu,
-        "6": file_obfuscate_menu,
+        "1": translate_menu,
+        "2": hash_menu,
+        "3": detect_menu,
+        "4": batch_menu,
+        "5": file_obfuscate_menu,
     }
     while True:
         utils.print_header("PYTHON ENCODER SECURITY TOOLKIT")
-        print("\n1. Encode")
-        print("2. Decode")
-        print("3. Hashing")
-        print("4. Deteksi Encoding")
-        print("5. Batch Processing")
-        print("6. Obfuscate File (HTML/CSS/JS/PY)")
-        print("7. Keluar")
+        print("\n1. Encode & Decode")
+        print("2. Hashing")
+        print("3. Deteksi Encoding")
+        print("4. Batch Processing")
+        print("5. Obfuscate File (HTML/CSS/JS/PY)")
+        print("6. Keluar")
         choice = input("\nPilih: ").strip()
-        if choice == "7":
+        if choice == "6":
             print("\nSampai jumpa!")
             break
         action = menu_actions.get(choice)

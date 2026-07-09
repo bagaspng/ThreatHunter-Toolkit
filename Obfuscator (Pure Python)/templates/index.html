@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Obfuscator Toolkit — encode, decode, dan obfuscate (JS/CSS/Python/HTML) langsung dari browser. Pure Python + Flask.">
+  <title>Obfuscator Toolkit</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='8'%20fill='%236366f1'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='6'%20fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand"><span class="dot"></span> Pure Python · Web API</div>
+      <h1>Obfuscator Toolkit</h1>
+      <p>Encode, decode, dan obfuscate langsung dari browser.</p>
+    </header>
+
+    <div class="grid">
+    <section class="card">
+      <div class="card-head"><h2>Encode &amp; Decode</h2><span>satu input, dua hasil</span></div>
+      <label class="small" for="ed-input">Teks</label>
+      <textarea id="ed-input" placeholder="Masukkan teks di sini..."></textarea>
+      <div class="counter" id="ed-count">0 karakter · 0 byte</div>
+      <div class="row">
+        <button class="btn" id="ed-run" onclick="translateText()">Proses</button>
+        <button class="btn ghost" onclick="clearEd()">Bersihkan</button>
+        <label class="live"><input type="checkbox" id="ed-live" checked> Live</label>
+      </div>
+      <div class="result-head">
+        <span class="meta">Hasil</span>
+        <label class="live"><input type="checkbox" id="ed-showfail"> Tampilkan yang gagal</label>
+      </div>
+      <div id="ed-out" class="results empty">Hasil encode dan decode akan muncul di sini.</div>
+    </section>
+
+    <section class="card" id="ob-card">
+      <div class="card-head"><h2>Obfuscate</h2><span>js · css · py · html</span></div>
+      <label class="small">Tipe</label>
+      <div class="seg" id="ob-type">
+        <button type="button" class="seg-btn active" data-val="py">Python</button>
+        <button type="button" class="seg-btn" data-val="js">JavaScript</button>
+        <button type="button" class="seg-btn" data-val="css">CSS</button>
+        <button type="button" class="seg-btn" data-val="html">HTML</button>
+      </div>
+      <label class="small" for="ob-input" style="margin-top:.95rem">Kode</label>
+      <textarea id="ob-input" placeholder="Tempel kode di sini, atau unggah / seret file ke kartu ini..."></textarea>
+      <div class="counter" id="ob-count">0 karakter · 0 byte</div>
+      <div class="row">
+        <button class="btn" id="ob-run" onclick="obfuscate()">Obfuscate</button>
+        <label class="file-btn">Unggah file
+          <input type="file" id="ob-file" accept=".js,.css,.py,.html,.htm,.txt" hidden>
+        </label>
+        <button class="btn ghost" onclick="clearOb()">Bersihkan</button>
+        <span class="file-name" id="ob-file-name"></span>
+      </div>
+      <div class="result-head">
+        <span class="meta" id="ob-meta">Hasil</span>
+        <div class="result-actions">
+          <button class="dl" id="ob-dl" onclick="downloadResult()" disabled>Unduh</button>
+          <button class="copy" onclick="copyOut('ob-out')">Salin</button>
+        </div>
+      </div>
+      <pre id="ob-out" class="empty">Hasil obfuscate akan muncul di sini.</pre>
+    </section>
+    </div>
+
+    <footer>Berjalan di <code>127.0.0.1:5000</code> · logika di <code>modules/</code></footer>
+  </div>
+
+  <div id="toast-wrap" class="toast-wrap"></div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

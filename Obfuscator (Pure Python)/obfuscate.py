@@ -81,6 +81,9 @@ def main(argv=None):
     elif ftype == "css":
         result, mapping = css_obfuscator.obfuscate_css(content)
         print("[verify] OK: self-check round-trip packer lolos", file=sys.stderr)
+        print("[info] hasil CSS berupa JavaScript (injector penyuntik CSS); "
+              "pakai di dalam <script> dan simpan sebagai .js (mis. .css.js), "
+              "bukan .css", file=sys.stderr)
         map_path = args.map_output
         if map_path is None and args.output:
             map_path = args.output + ".map.json"

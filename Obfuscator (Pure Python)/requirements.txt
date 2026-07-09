@@ -1,0 +1,5 @@
+# Dependency runtime untuk Web API (app.py)
+flask
+
+# Hanya untuk membangun LAPORAN.pdf dari LAPORAN.md (opsional, bukan runtime)
+markdown
