@@ -51,7 +51,6 @@ Opsi:
     Obfuscator (Pure Python)/
     ├── main.py               # menu interaktif
     ├── obfuscate.py          # CLI non-interaktif
-    ├── requirements.txt      # kosong — tidak ada dependency eksternal
     ├── Example/              # contoh input (css/html/js/py tester)
     ├── Result/               # folder output default (dibuat otomatis)
     └── modules/              # seluruh modul (lihat bab 5)
