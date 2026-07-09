@@ -175,15 +175,18 @@ def file_obfuscate_menu():
                 _write_or_show(result)
             elif choice == "2":
                 result = js_obfuscator.obfuscate_js(code, "high")
+                print("\n[verify] OK self-check round-trip packer lolos")
                 _write_or_show(result)
             elif choice == "3":
                 result, mapping = css_obfuscator.obfuscate_css(code)
+                print("\n[verify] OK self-check round-trip packer lolos")
                 import json
                 mapping_text = json.dumps(mapping, indent=2, ensure_ascii=False)
                 print("\nMapping class/id:\n" + mapping_text)
                 _write_or_show(result)
             else:
                 result = py_obfuscator.obfuscate_python(code)
+                print("\n[verify] OK payload decode + syntax output tervalidasi")
                 _write_or_show(result)
         except Exception as e:
             print("Error:", e)

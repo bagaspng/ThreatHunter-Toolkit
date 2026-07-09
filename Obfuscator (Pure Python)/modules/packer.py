@@ -13,7 +13,7 @@ def _num(n):
 
 
 def _rand_name():
-    return "".join(random.choice("$_") for _ in range(random.randint(3, 6)))
+    return "_" * random.randint(3, 6)
 
 
 def _digit_map():
@@ -76,6 +76,30 @@ def _encrypt(units, seed, mul):
     return out
 
 
+def _from_units(units):
+    out = []
+    i = 0
+    n = len(units)
+    while i < n:
+        u = units[i]
+        if 0xD800 <= u <= 0xDBFF and i + 1 < n and 0xDC00 <= units[i + 1] <= 0xDFFF:
+            out.append(chr(0x10000 + ((u - 0xD800) << 10) + (units[i + 1] - 0xDC00)))
+            i += 2
+        else:
+            out.append(chr(u))
+            i += 1
+    return "".join(out)
+
+
+def _replay(cipher, seed, mul):
+    key = seed
+    units = []
+    for x in cipher:
+        units.append((x - key) % _M)
+        key = (key * mul + x + seed) % _M
+    return units
+
+
 def _pack_once(src):
     g = _rand_name()
     dmap = _digit_map()
@@ -83,7 +107,12 @@ def _pack_once(src):
     mul = random.randint(2, _M - 1) | 1
     cipher = _encrypt(_units(src), seed, mul)
 
-    kc, ka, ks, kk, kr, ki, kx = "$", "$$", "$$$", "$_", "_$", "$$_", "$_$"
+    if _from_units(_replay(cipher, seed, mul)) != src:
+        raise RuntimeError("packer self-check gagal: round-trip decode tidak cocok")
+
+    kc, ka, ks, kk, kr, ki, kx = (
+        "_" * 11, "_" * 12, "_" * 13, "_" * 14, "_" * 15, "_" * 16, "_" * 17,
+    )
     m = _numx(g, dmap, _M)
     seedx = _numx(g, dmap, seed)
     mulx = _numx(g, dmap, mul)
