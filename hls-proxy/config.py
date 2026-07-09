@@ -1,5 +1,5 @@
 STREAM_URL = (
-    "https://vault-01.uwucdn.top/stream/01/09/b5513e71f8df5bcc7b513b1157137cc14fef15899f278daa032478d87e36e9a1/uwu.m3u8"
+    "https://vault-13.owocdn.top/stream/13/14/da333978e2c3792eec006d08869128b9df1508803fa02869be540a45ef801576/uwu.m3u8"
 )
 
 REFERER = "https://kwik.cx/"

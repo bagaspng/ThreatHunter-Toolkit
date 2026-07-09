@@ -13,7 +13,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 from config import HOST, PORT, STREAM_URL, REFERER
 
-# ── Logging setup ───────────────────────────────────────────────────
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -22,17 +21,13 @@ LOG_FORMAT = "%(asctime)s [%(levelname)-5s] %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 def setup_logging():
-    """Configure root logger with console + rotating file handler."""
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    # Console handler — concise output for terminal
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     console.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
     root.addHandler(console)
-
-    # File handler — rotated at 5 MB, keeps 3 old files
     file_handler = RotatingFileHandler(
         LOG_FILE,
         maxBytes=5 * 1024 * 1024,
@@ -43,11 +38,8 @@ def setup_logging():
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
     root.addHandler(file_handler)
 
-    # Suppress noisy werkzeug request logs (we log our own in proxy.py)
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
-
-# ── Main ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     setup_logging()
 

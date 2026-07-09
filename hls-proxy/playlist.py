@@ -1,9 +1,12 @@
 """
-playlist.py — Fetches and rewrites the HLS playlist from the CDN.
+playlist.py — Fetches and rewrites HLS playlists from the CDN.
 
-Rewrites all absolute URLs inside the .m3u8 so the browser routes
-segment/key/map requests through our local proxy instead of hitting
-the CDN directly (which would fail due to missing Referer).
+Fungsi:
+- Fetch playlist .m3u8 dari CDN.
+- Rewrite key ke /key.
+- Rewrite segment ke /segment.
+- Rewrite nested playlist ke /playlist.
+- Mendukung URL absolute dan relative.
 """
 
 import re
@@ -17,15 +20,53 @@ from config import REFERER, STREAM_URL
 logger = logging.getLogger("hls_proxy")
 
 
-def rewrite_playlist(content: str) -> str:
-    """
-    Parses the raw .m3u8 text and rewrites internal URLs:
-      - #EXT-X-KEY URI  → /key?url=<encoded>
-      - #EXT-X-MAP URI  → /segment?url=<encoded>
-      - Segment lines   → /segment?url=<encoded>
-    """
+def make_absolute_url(base_url: str, target_url: str) -> str:
+    return urllib.parse.urljoin(base_url, target_url)
+
+
+def make_local_url(
+    original_url: str,
+    base_url: str,
+    endpoint: str,
+    referer: str | None = None,
+) -> str:
+    absolute_url = make_absolute_url(base_url, original_url)
+    encoded_url = urllib.parse.quote(absolute_url, safe="")
+    local_url = f"{endpoint}?url={encoded_url}"
+
+    if referer:
+        local_url += "&referer=" + urllib.parse.quote(referer, safe="")
+
+    return local_url
+
+
+def rewrite_uri_attribute(
+    line: str,
+    base_url: str,
+    endpoint: str,
+    referer: str | None = None,
+) -> str:
+    match = re.search(r'URI="([^"]+)"', line)
+
+    if not match:
+        return line
+
+    original_url = match.group(1)
+    local_url = make_local_url(original_url, base_url, endpoint, referer)
+
+    return line.replace(f'URI="{original_url}"', f'URI="{local_url}"')
+
+
+def is_playlist_url(url: str) -> bool:
+    clean_url = url.split("?")[0].lower()
+    return clean_url.endswith(".m3u8")
+
+
+def rewrite_playlist(content: str, base_url: str, referer: str | None = None) -> str:
     lines = content.splitlines()
     result = []
+
+    next_line_is_variant_playlist = False
 
     for line in lines:
         stripped = line.strip()
@@ -34,74 +75,180 @@ def rewrite_playlist(content: str) -> str:
             result.append(line)
             continue
 
-        # 1. Rewrite decryption key URI
         if stripped.startswith("#EXT-X-KEY:"):
-            match = re.search(r'URI="([^"]+)"', stripped)
-            if match:
-                original = match.group(1)
-                local = f'/key?url={urllib.parse.quote(original, safe="")}'
-                result.append(stripped.replace(f'URI="{original}"', f'URI="{local}"'))
-            else:
-                result.append(line)
+            result.append(
+                rewrite_uri_attribute(
+                    line=line,
+                    base_url=base_url,
+                    endpoint="/key",
+                    referer=referer,
+                )
+            )
+            continue
 
-        # 2. Rewrite initialization map URI
-        elif stripped.startswith("#EXT-X-MAP:"):
-            match = re.search(r'URI="([^"]+)"', stripped)
-            if match:
-                original = match.group(1)
-                local = f'/segment?url={urllib.parse.quote(original, safe="")}'
-                result.append(stripped.replace(f'URI="{original}"', f'URI="{local}"'))
-            else:
-                result.append(line)
+        if stripped.startswith("#EXT-X-SESSION-KEY:"):
+            result.append(
+                rewrite_uri_attribute(
+                    line=line,
+                    base_url=base_url,
+                    endpoint="/key",
+                    referer=referer,
+                )
+            )
+            continue
 
-        # 3. Rewrite segment URLs (non-comment lines starting with http)
-        elif not stripped.startswith("#"):
-            if stripped.startswith(("http://", "https://")):
-                local = f'/segment?url={urllib.parse.quote(stripped, safe="")}'
-                result.append(local)
-            else:
-                result.append(line)
-        else:
+        if stripped.startswith("#EXT-X-MAP:"):
+            result.append(
+                rewrite_uri_attribute(
+                    line=line,
+                    base_url=base_url,
+                    endpoint="/segment",
+                    referer=referer,
+                )
+            )
+            continue
+
+        if stripped.startswith("#EXT-X-MEDIA:"):
+            result.append(
+                rewrite_uri_attribute(
+                    line=line,
+                    base_url=base_url,
+                    endpoint="/playlist",
+                    referer=referer,
+                )
+            )
+            continue
+
+        if stripped.startswith("#EXT-X-I-FRAME-STREAM-INF:"):
+            result.append(
+                rewrite_uri_attribute(
+                    line=line,
+                    base_url=base_url,
+                    endpoint="/playlist",
+                    referer=referer,
+                )
+            )
+            continue
+
+        if stripped.startswith("#EXT-X-STREAM-INF:"):
+            next_line_is_variant_playlist = True
             result.append(line)
+            continue
 
-    return "\n".join(result)
+        if stripped.startswith("#"):
+            result.append(line)
+            continue
+
+        if next_line_is_variant_playlist or is_playlist_url(stripped):
+            result.append(
+                make_local_url(
+                    original_url=stripped,
+                    base_url=base_url,
+                    endpoint="/playlist",
+                    referer=referer,
+                )
+            )
+            next_line_is_variant_playlist = False
+            continue
+
+        result.append(
+            make_local_url(
+                original_url=stripped,
+                base_url=base_url,
+                endpoint="/segment",
+                referer=referer,
+            )
+        )
+
+    return "\n".join(result) + "\n"
 
 
-def get_playlist_response() -> Response:
-    """
-    Fetches the remote .m3u8 playlist via curl_cffi, rewrites URLs,
-    and returns a Flask Response with the correct MIME type.
-    """
+def get_playlist_response(
+    source_url: str | None = None,
+    referer: str | None = None,
+) -> Response:
     start_time = time.time()
+
+    if not source_url:
+        source_url = STREAM_URL
+
+    # Referer dari query dipakai bila ada; jika tidak, pakai default config.py.
+    effective_referer = referer or REFERER
 
     try:
         response = requests.get(
-            STREAM_URL,
-            headers={"Referer": REFERER},
+            source_url,
+            headers={
+                "Referer": effective_referer,
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+            },
             impersonate="chrome",
+            timeout=30,
         )
 
         duration = time.time() - start_time
+
         logger.info(
-            f"PLAYLIST {response.status_code} | {duration:.2f}s | {STREAM_URL.split('/')[-1]}"
+            f"PLAYLIST {response.status_code} | "
+            f"{duration:.2f}s | "
+            f"{source_url.split('/')[-1]}"
         )
 
         if response.status_code != 200:
-            logger.warning(f"PLAYLIST CDN returned {response.status_code}")
             return Response(
-                f"CDN error {response.status_code}: {response.text[:200]}",
+                f"CDN playlist error {response.status_code}: {response.text[:300]}",
                 status=response.status_code,
+                headers={
+                    "Content-Type": "text/plain",
+                    "Cache-Control": "no-store",
+                },
             )
 
-        rewritten = rewrite_playlist(response.text)
+        content = response.text
+
+        if content.lstrip().lower().startswith("<html"):
+            return Response(
+                "Upstream returned HTML instead of HLS playlist",
+                status=502,
+                headers={
+                    "Content-Type": "text/plain",
+                    "Cache-Control": "no-store",
+                },
+            )
+
+        rewritten = rewrite_playlist(
+            content=content,
+            base_url=source_url,
+            referer=referer,
+        )
 
         return Response(
             rewritten,
             status=200,
-            mimetype="application/vnd.apple.mpegurl",
+            headers={
+                "Content-Type": "application/vnd.apple.mpegurl",
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
         )
 
     except Exception as e:
         duration = time.time() - start_time
-        logger.error(f"PLAYLIST FAIL | {duration:.2f}s | {e}")
-        return Response(f"Playlist error: {e}", status=502)
+
+        logger.error(
+            f"PLAYLIST FAIL | "
+            f"{duration:.2f}s | "
+            f"{e} | "
+            f"{source_url}"
+        )
+
+        return Response(
+            f"Playlist error: {e}",
+            status=502,
+            headers={
+                "Content-Type": "text/plain",
+                "Cache-Control": "no-store",
+            },
+        )
