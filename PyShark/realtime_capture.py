@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import json
 import os
-import signal
 import sys
 import threading
 from datetime import datetime
@@ -12,10 +11,18 @@ import pyshark
 
 def ensure_event_loop():
     try:
-        asyncio.get_event_loop()
+        loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+
+    def _silent_exception_handler(loop, context):
+        exc = context.get("exception")
+        if isinstance(exc, EOFError):
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_silent_exception_handler)
 
 
 class RealtimeCaptureWriter:
@@ -59,43 +66,29 @@ class RealtimeCaptureWriter:
             print(f"[!] Gagal menulis ke {self.output_path}: {e}", file=sys.stderr)
 
 
+def layer_to_dict(layer) -> dict:
+    fields = {}
+    for field_name in layer.field_names:
+        try:
+            value = layer.get_field_value(field_name)
+        except Exception:
+            value = None
+        fields[field_name] = str(value) if value is not None else None
+    return fields
+
+
 def packet_to_dict(pkt) -> dict:
     record = {
         "timestamp": datetime.now().isoformat(),
-        "frame_time": getattr(pkt, "sniff_time", None).isoformat() if getattr(pkt, "sniff_time", None) else None,
-        "length": int(pkt.length) if hasattr(pkt, "length") else None,
+        "frame_number": getattr(pkt, "number", None),
+        "sniff_time": pkt.sniff_time.isoformat() if getattr(pkt, "sniff_time", None) else None,
+        "length": pkt.length if hasattr(pkt, "length") else None,
         "highest_layer": pkt.highest_layer if hasattr(pkt, "highest_layer") else None,
-        "protocol": None,
-        "src_ip": None,
-        "dst_ip": None,
-        "src_port": None,
-        "dst_port": None,
-        "info": None,
+        "layers": {},
     }
 
-    try:
-        if hasattr(pkt, "ip"):
-            record["src_ip"] = pkt.ip.src
-            record["dst_ip"] = pkt.ip.dst
-            record["protocol"] = "IPv4"
-        elif hasattr(pkt, "ipv6"):
-            record["src_ip"] = pkt.ipv6.src
-            record["dst_ip"] = pkt.ipv6.dst
-            record["protocol"] = "IPv6"
-    except AttributeError:
-        pass
-
-    try:
-        if hasattr(pkt, "tcp"):
-            record["src_port"] = pkt.tcp.srcport
-            record["dst_port"] = pkt.tcp.dstport
-            record["info"] = "TCP"
-        elif hasattr(pkt, "udp"):
-            record["src_port"] = pkt.udp.srcport
-            record["dst_port"] = pkt.udp.dstport
-            record["info"] = "UDP"
-    except AttributeError:
-        pass
+    for layer in pkt.layers:
+        record["layers"][layer.layer_name] = layer_to_dict(layer)
 
     return record
 
@@ -106,7 +99,7 @@ def main():
     parser.add_argument("-o", "--output", default="capture_output.json")
     parser.add_argument("-f", "--filter", default=None)
     parser.add_argument("--flush-interval", type=float, default=2.0)
-    parser.add_argument("--max-records", type=int, default=None)
+    parser.add_argument("--max-records", type=int, default=100)
     args = parser.parse_args()
 
     ensure_event_loop()
@@ -128,27 +121,34 @@ def main():
     print(f"[*] Hasil akan diupdate real-time ke: {args.output}")
     print("[*] Tekan CTRL+C untuk berhenti.\n")
 
-    def handle_sigint(sig, frame):
-        print("\n[*] Menghentikan capture, menyimpan sisa data...")
-        writer.stop()
-        print("[*] Selesai. File JSON final tersimpan di:", args.output)
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, handle_sigint)
+    exit_code = 0
 
     try:
         for pkt in capture.sniff_continuously():
             try:
                 record = packet_to_dict(pkt)
                 writer.add_packet(record)
-                print(f"[+] {record['timestamp']} {record.get('src_ip')}:{record.get('src_port')} -> "
-                      f"{record.get('dst_ip')}:{record.get('dst_port')} ({record.get('highest_layer')})")
+                ip_layer = record["layers"].get("ip") or record["layers"].get("ipv6") or {}
+                src = ip_layer.get("ip.src") or ip_layer.get("ipv6.src")
+                dst = ip_layer.get("ip.dst") or ip_layer.get("ipv6.dst")
+                print(f"[+] #{record['frame_number']} {src} -> {dst} "
+                      f"[{record['highest_layer']}] len={record['length']}")
             except Exception as e:
                 print(f"[!] Error memproses paket: {e}", file=sys.stderr)
+    except KeyboardInterrupt:
+        print("\n[*] Menghentikan capture, menyimpan sisa data...")
     except Exception as e:
         print(f"[!] Capture error: {e}", file=sys.stderr)
+        exit_code = 1
+    finally:
+        try:
+            capture.close()
+        except Exception:
+            pass
         writer.stop()
-        sys.exit(1)
+        print("[*] Selesai. File JSON final tersimpan di:", args.output)
+
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
