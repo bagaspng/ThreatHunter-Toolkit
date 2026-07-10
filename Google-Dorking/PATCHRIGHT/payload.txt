@@ -1,0 +1,11 @@
+# 1. Mencari dokumen PDF berisi NIK di situs pemerintah
+site:go.id filetype:pdf "Nomor Induk Kependudukan"
+
+# 2. Mencari spreadsheet Excel yang terekspos
+site:go.id filetype:xlsx "password" OR "login"
+
+# 3. Mencari file konfigurasi atau backup
+site:go.id filetype:sql "CREATE TABLE"
+
+# 4. Target kampus/pendidikan
+site:ac.id filetype:doc "kata pengantar"

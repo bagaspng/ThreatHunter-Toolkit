@@ -1,50 +1,29 @@
 import json
+import asyncio
 import os
 import sys
 import io
 import random
 import re
-import time
-import requests
-import urllib3
 from pathlib import Path
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-# Matikan warning SSL
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Fix encoding console Windows
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
 
-# Auto-install dependencies
+# Import Patchright dengan auto-install
 try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from selenium.webdriver.common.action_chains import ActionChains
-    from selenium.common.exceptions import TimeoutException, WebDriverException
-    from webdriver_manager.chrome import ChromeDriverManager
+    from patchright.async_api import async_playwright
 except ImportError:
-    print("Menginstal dependencies Selenium...")
+    print("Menginstal patchright...")
     import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "selenium", "webdriver-manager", "requests", "-q"])
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from selenium.webdriver.common.action_chains import ActionChains
-    from selenium.common.exceptions import TimeoutException, WebDriverException
-    from webdriver_manager.chrome import ChromeDriverManager
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "patchright", "-q"])
+    subprocess.check_call([sys.executable, "-m", "patchright", "install", "chromium"])
+    from patchright.async_api import async_playwright
 
-# Fingerprint configs
+# === KONFIGURASI FINGERPRINT ===
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -62,7 +41,7 @@ VIEWPORTS = [
 
 LOCALES = ["en-US", "en-GB", "en-CA", "id-ID"]
 
-# Helper functions
+# === HELPER FUNCTIONS ===
 def get_int_input(prompt, min_val, max_val, default):
     while True:
         try:
@@ -95,7 +74,7 @@ def log_event(message: str, level: str = "INFO"):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] [{level}] {message}")
 
-# Stealth & anti-detection
+# === STEALTH & ANTI-DETECTION ===
 class StealthManager:
     def get_random_fingerprint(self):
         return {
@@ -105,14 +84,17 @@ class StealthManager:
             "timezone_id": random.choice(["America/New_York", "Europe/London", "Asia/Singapore", "Asia/Jakarta"]),
         }
 
-# Main Dorker class
+# === MAIN DORKER CLASS ===
 class GoogleDorker:
     def __init__(self, headless: bool = True, delay: float = 2.0):
         self.headless = headless
         self.delay = delay
         self.results = []
         self.seen_urls = set()
-        self.driver = None
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
         self.stealth = StealthManager()
         self.cookies_file = Path.home() / ".google_dork_cookies.json"
         
@@ -132,14 +114,10 @@ class GoogleDorker:
         if filetype: parts.append(f"filetype:{filetype}")
         return " ".join(parts)
 
-    def init_browser(self, fresh_session: bool = False):
+    async def init_browser(self, fresh_session: bool = False):
         log_event("Inisialisasi browser...", "INFO")
-        
-        options = Options()
-        
-        if self.headless:
-            options.add_argument("--headless=new")
-            
+        self.playwright = await async_playwright().start()
+
         launch_args = [
             '--disable-blink-features=AutomationControlled', 
             '--disable-dev-shm-usage',
@@ -150,117 +128,91 @@ class GoogleDorker:
             '--disable-extensions', 
             '--mute-audio', 
             '--no-first-run',
-            '--ignore-certificate-errors',
         ]
-        for arg in launch_args:
-            options.add_argument(arg)
-            
-        fp = self.stealth.get_random_fingerprint()
-        options.add_argument(f"--user-agent={fp['user_agent']}")
-        options.add_argument(f"--window-size={fp['viewport']['width']},{fp['viewport']['height']}")
-        options.add_argument(f"--lang={fp['locale']}")
-        
-        # Block images/css biar loading cepet
-        prefs = {
-            "profile.managed_default_content_settings.images": 2,
-            "profile.managed_default_content_settings.stylesheets": 2,
-            "profile.managed_default_content_settings.fonts": 2,
-            "profile.managed_default_content_settings.media_stream": 2,
-        }
-        options.add_experimental_option("prefs", prefs)
-        
-        # Hide automation flags
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
 
-        try:
-            # Init driver, fallback ke webdriver-manager kalau gagal
-            self.driver = webdriver.Chrome(options=options)
-        except Exception as e:
-            log_event(f"Gagal init tanpa manager: {e}, mencoba webdriver-manager...", "WARNING")
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=options)
-            
-        # Override timezone via CDP
-        try:
-            self.driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {'timezoneId': fp['timezone_id']})
-        except Exception:
-            pass
-            
-        # Patch navigator.webdriver
-        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        
-        # Load cookies
-        self.driver.get("https://www.google.com")
-        if not fresh_session:
-            self.load_cookies()
-            
-        self.driver.set_page_load_timeout(60)
-        log_event("Browser berhasil diinisialisasi", "SUCCESS")
+        self.browser = await self.playwright.chromium.launch(
+            headless=self.headless, 
+            args=launch_args
+        )
 
-    def load_cookies(self):
-        if self.cookies_file.exists():
+        context_options = self.stealth.get_random_fingerprint()
+        self.context = await self.browser.new_context(
+            **context_options,
+            accept_downloads=True  # Enable download handling
+        )
+
+        if not fresh_session and self.cookies_file.exists():
             try:
                 with open(self.cookies_file, 'r') as f:
-                    cookies = json.load(f)
-                    for cookie in cookies:
-                        if 'expiry' in cookie and isinstance(cookie['expiry'], float):
-                            cookie['expiry'] = int(cookie['expiry'])
-                        try:
-                            self.driver.add_cookie(cookie)
-                        except Exception:
-                            pass
+                    await self.context.add_cookies(json.load(f))
                 log_event("Cookie sesi lama dimuat", "INFO")
             except Exception as e:
                 log_event(f"Gagal memuat cookie: {e}", "WARNING")
 
-    def save_cookies(self):
+        self.page = await self.context.new_page()
+
+        async def block_assets(route):
+            if route.request.resource_type in ["image", "stylesheet", "font", "media"]: 
+                await route.abort()
+            else: 
+                await route.continue_()
+                
+        await self.page.route("**/*", block_assets)
+        self.page.set_default_timeout(60000)
+        log_event("Browser berhasil diinisialisasi", "SUCCESS")
+
+    async def save_cookies(self):
         try:
-            cookies = self.driver.get_cookies()
+            cookies = await self.context.cookies()
             with open(self.cookies_file, 'w') as f: 
                 json.dump(cookies, f)
         except Exception as e:
             log_event(f"Gagal menyimpan cookie: {e}", "WARNING")
 
-    def close_browser(self):
-        if self.driver:
-            self.save_cookies()
-            self.driver.quit()
+    async def close_browser(self):
+        if self.context: await self.save_cookies()
+        if self.browser: await self.browser.close()
+        if self.playwright: await self.playwright.stop()
         log_event("Browser ditutup", "INFO")
 
-    def detect_captcha(self) -> bool:
+    async def detect_captcha(self) -> bool:
         captcha_selectors = [
             '#recaptcha', 'form[action*="captcha"]', '#captcha-form', 
             'div[aria-label*="reCAPTCHA"]', '.g-recaptcha', 'iframe[src*="recaptcha"]'
         ]
         for sel in captcha_selectors:
-            if self.driver.find_elements(By.CSS_SELECTOR, sel):
+            if await self.page.query_selector(sel):
                 return True
         return False
 
-    def human_mouse_movement(self, element=None):
+    async def human_mouse_movement(self, element=None):
         try:
-            actions = ActionChains(self.driver)
             start_x, start_y = random.randint(100, 500), random.randint(100, 400)
-            actions.move_by_offset(start_x, start_y).perform()
-            time.sleep(random.uniform(0.1, 0.3))
+            await self.page.mouse.move(start_x, start_y)
+            await asyncio.sleep(random.uniform(0.1, 0.3))
             if element:
-                actions.move_to_element(element).perform()
+                box = await element.bounding_box()
+                if box:
+                    target_x, target_y = box['x'] + box['width'] / 2, box['y'] + box['height'] / 2
+                    for _ in range(random.randint(3, 6)):
+                        way_x = start_x + (target_x - start_x) * random.uniform(0.1, 0.9) + random.randint(-30, 30)
+                        way_y = start_y + (target_y - start_y) * random.uniform(0.1, 0.9) + random.randint(-30, 30)
+                        await self.page.mouse.move(way_x, way_y)
+                        await asyncio.sleep(random.uniform(0.05, 0.15))
         except Exception as e:
             log_event(f"Error simulasi mouse: {e}", "WARNING")
 
-    def human_scroll(self):
+    async def human_scroll(self):
         try:
             for _ in range(random.randint(2, 4)):
-                scroll_y = random.randint(200, 500)
-                self.driver.execute_script(f"window.scrollBy(0, {scroll_y});")
-                time.sleep(random.uniform(0.3, 0.7))
-            self.driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(random.uniform(0.2, 0.5))
+                await self.page.evaluate(f"window.scrollBy(0, {random.randint(200, 500)})")
+                await asyncio.sleep(random.uniform(0.3, 0.7))
+            await self.page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.sleep(random.uniform(0.2, 0.5))
         except Exception as e:
             log_event(f"Error simulasi scroll: {e}", "WARNING")
 
-    def handle_captcha(self) -> bool:
+    async def handle_captcha(self) -> bool:
         print("\n" + "!"*60)
         print("  [!] CAPTCHA / BOT DETECTION TERDETEKSI!")
         print("!"*60)
@@ -269,71 +221,169 @@ class GoogleDorker:
             return False
         print("  [+] Browser terlihat. Silakan selesaikan CAPTCHA secara manual.")
         input("\n  [>] TEKAN ENTER SETELAH CAPTCHA SELESAI...")
-        time.sleep(1)
+        await asyncio.sleep(1)
         
-        if self.detect_captcha():
+        if await self.detect_captcha():
             print("  [-] CAPTCHA masih ada.")
             return False
         print("  [+] CAPTCHA berhasil dilewati!")
         return True
 
-    # Validate URLs pake ThreadPool
-    def validate_urls(self, results: list) -> list:
+    # === SISTEM VALIDASI URL YANG ROBUST ===
+    async def validate_urls(self, results: list) -> list:
         if not results:
             return results
             
         total = len(results)
         print(f"    Memvalidasi {total} URL...")
         
-        def check_url(res):
-            status = self._validate_single_url(res['url'])
-            res['status'] = status
-            self.stats["urls_validated"] += 1
-            if status in [200, 201, 202, 204, 206, 301, 302, 307, 308]:
-                self.stats["urls_alive"] += 1
-            else:
-                self.stats["urls_dead"] += 1
-            return res
-
-        validated = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(check_url, res) for res in results]
-            for i, future in enumerate(as_completed(futures)):
-                validated.append(future.result())
-                if (i + 1) % 3 == 0 or i + 1 == total:
-                    print(f"      Progress: {i + 1}/{total} URL divalidasi")
-                    
+        # Semaphore untuk kontrol concurrency (5 concurrent untuk page navigation)
+        semaphore = asyncio.Semaphore(5)
+        
+        async def check_with_progress(result, index):
+            async with semaphore:
+                status = await self._validate_single_url(result['url'])
+                result['status'] = status
+                
+                # Update stats
+                self.stats["urls_validated"] += 1
+                if status in [200, 201, 202, 204, 206, 301, 302, 307, 308]:
+                    self.stats["urls_alive"] += 1
+                else:
+                    self.stats["urls_dead"] += 1
+                
+                # Progress indicator
+                if (index + 1) % 3 == 0 or index == total - 1:
+                    print(f"      Progress: {index + 1}/{total} URL divalidasi")
+                
+                return result
+        
+        tasks = [check_with_progress(res, i) for i, res in enumerate(results)]
+        validated = await asyncio.gather(*tasks)
+        
         print(f"    ✓ Validasi selesai | Alive: {self.stats['urls_alive']} | Dead: {self.stats['urls_dead']}")
-        return validated
+        return list(validated)
     
-    def _validate_single_url(self, url: str) -> int:
-        """Cek status URL pake requests"""
+    async def _validate_single_url(self, url: str) -> int:
+        """
+        Validasi URL menggunakan actual page navigation dengan download handling
+        """
+        # Layer 1: Coba dengan HTTP request cepat
+        status = await self._try_http_request(url, timeout=10000)
+        
+        # Jika status OK atau redirect, return langsung
+        if status in [200, 201, 202, 204, 206, 301, 302, 307, 308]:
+            return status
+        
+        # Layer 2: Jika 403/401/0, coba dengan actual page navigation
+        # Ini akan handle kasus di mana server menolak HTTP request tapi browser bisa akses
+        status = await self._try_page_navigation(url, timeout=15000)
+        
+        return status
+    
+    async def _try_http_request(self, url: str, timeout: int = 10000) -> int:
+        """
+        HTTP request cepat menggunakan context.request
+        """
         try:
-            headers = {"User-Agent": random.choice(USER_AGENTS)}
-            response = requests.get(url, timeout=10, headers=headers, allow_redirects=True, verify=False)
-            return response.status_code
+            response = await self.context.request.get(
+                url,
+                max_redirects=10,
+                timeout=timeout,
+                ignore_https_errors=True
+            )
+            return response.status
         except Exception:
             return 0
-
-    def extract_results(self) -> list:
-        results = []
-        elements = self.driver.find_elements(By.CSS_SELECTOR, 'div.g, div[data-hveid]')
-        for elem in elements:
-            try:
-                title_elem = elem.find_elements(By.CSS_SELECTOR, 'h3')
-                if not title_elem: continue
-                title = title_elem[0].text.strip()
+    
+    async def _try_page_navigation(self, url: str, timeout: int = 15000) -> int:
+        """
+        Validasi menggunakan actual page navigation dengan download handling
+        Ini akan menangkap kasus di mana 403 di HTTP tapi file bisa didownload via browser
+        """
+        temp_page = None
+        try:
+            # Buka page baru untuk validasi
+            temp_page = await self.context.new_page()
+            
+            # Listen untuk download event
+            download_triggered = False
+            download_path = None
+            
+            async def handle_download(download):
+                nonlocal download_triggered, download_path
+                download_triggered = True
+                # Save download ke temporary file
+                download_path = await download.path()
+            
+            temp_page.on("download", handle_download)
+            
+            # Navigate ke URL
+            response = await temp_page.goto(
+                url,
+                wait_until='commit',  # Jangan tunggu full load, cukup commit
+                timeout=timeout
+            )
+            
+            # Tunggu sebentar untuk melihat apakah ada download
+            await asyncio.sleep(2)
+            
+            # Jika ada download, berarti file berhasil diakses
+            if download_triggered:
+                return 200
+            
+            # Jika tidak ada download, cek response status
+            if response:
+                status = response.status
                 
-                link_elem = elem.find_elements(By.CSS_SELECTOR, 'a')
+                # Jika status 403 tapi page berhasil load (tidak ada error), 
+                # kemungkinan file bisa diakses
+                if status == 403:
+                    # Cek apakah page menampilkan error atau konten valid
+                    try:
+                        content = await temp_page.content()
+                        # Jika konten sangat kecil (< 1KB), kemungkinan error page
+                        if len(content) < 1000:
+                            return 403
+                        # Jika konten besar, kemungkinan file berhasil diakses
+                        else:
+                            return 200
+                    except:
+                        return 403
+                
+                return status
+            
+            return 0
+            
+        except Exception as e:
+            # Timeout atau error lain
+            return 0
+        finally:
+            # Tutup temp page
+            if temp_page:
+                try:
+                    await temp_page.close()
+                except:
+                    pass
+
+    async def extract_results(self) -> list:
+        results = []
+        for elem in await self.page.query_selector_all('div.g, div[data-hveid]'):
+            try:
+                title_elem = await elem.query_selector('h3')
+                if not title_elem: continue
+                title = (await title_elem.inner_text()).strip()
+                
+                link_elem = await elem.query_selector('a')
                 if not link_elem: continue
-                link = (link_elem[0].get_attribute('href') or "").strip()
+                link = (await link_elem.get_attribute('href') or "").strip()
                 
                 if not link or 'google.com' in link or link.startswith('/'): continue
                 if link in self.seen_urls: continue
                 
                 self.seen_urls.add(link)
-                snippet_elem = elem.find_elements(By.CSS_SELECTOR, 'div.VwiC3b, span.aCOpRe')
-                snippet = snippet_elem[0].text.strip()[:500] if snippet_elem else ""
+                snippet_elem = await elem.query_selector('div.VwiC3b, span.aCOpRe')
+                snippet = (await snippet_elem.inner_text()).strip()[:500] if snippet_elem else ""
                 
                 results.append({"judul": title, "url": link, "deskripsi": snippet, "status": 0})
             except Exception as e:
@@ -341,49 +391,44 @@ class GoogleDorker:
                 continue
         return results
 
-    def search_page(self, query: str, page_num: int) -> list:
+    async def search_page(self, query: str, page_num: int) -> list:
         url = f"https://www.google.com/search?q={query}&start={(page_num - 1) * 10}&hl=en"
         print(f"  Mengambil halaman {page_num}...", end=" ", flush=True)
         self.stats["total_requests"] += 1
 
         try:
-            self.driver.get(url)
-            time.sleep(self.delay + random.uniform(0.5, 1.5))
+            await self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            await asyncio.sleep(self.delay + random.uniform(0.5, 1.5))
             
-            self.human_scroll()
+            await self.human_scroll()
             
-            if self.detect_captcha():
+            if await self.detect_captcha():
                 print("BLOCKED!")
                 self.stats["captcha_encounters"] += 1
-                if not self.handle_captcha(): return []
-                self.driver.refresh()
-                time.sleep(2)
+                if not await self.handle_captcha(): return []
+                await self.page.reload(wait_until='domcontentloaded')
+                await asyncio.sleep(2)
 
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'div#search, div[data-hveid]'))
-            )
+            await self.page.wait_for_selector('div#search, div[data-hveid]', timeout=10000)
+            results = await self.extract_results()
             
-            results = self.extract_results()
-            
+            # Validasi URL
             if results:
-                results = self.validate_urls(results)
+                results = await self.validate_urls(results)
                 
             self.stats["successful_requests"] += 1
             print(f"OK ({len(results)} hasil baru)")
             return results
-        except TimeoutException:
-            print("ERROR: Timeout menunggu hasil")
-            return []
         except Exception as e:
             print(f"ERROR: {e}")
             return []
 
-    def execute_query(self, query: str, min_page: int, max_page: int) -> list:
+    async def execute_query(self, query: str, min_page: int, max_page: int) -> list:
         all_results = []
         for page_num in range(min_page, max_page + 1):
-            all_results.extend(self.search_page(query, page_num))
+            all_results.extend(await self.search_page(query, page_num))
             if page_num < max_page: 
-                time.sleep(self.delay + random.uniform(0.5, 1.5))
+                await asyncio.sleep(self.delay + random.uniform(0.5, 1.5))
         return all_results
 
     def save_json(self, filepath: str, data: list):
@@ -401,8 +446,8 @@ class GoogleDorker:
             print(f"  {k.replace('_', ' ').title()}: {v}")
         print("="*60)
 
-# CLI Modes
-def interactive_mode():
+# === MODE HANDLERS ===
+async def interactive_mode():
     print("\n" + "=" * 60)
     print("  MODE INTERAKTIF - Single Query")
     print("=" * 60)
@@ -419,18 +464,18 @@ def interactive_mode():
     print(f"\n  Query: {query} | Halaman: {min_page}-{max_page}")
     
     dorker = GoogleDorker(headless=not visible, delay=delay)
-    dorker.init_browser()
+    await dorker.init_browser()
     try:
-        all_results = dorker.execute_query(query, min_page, max_page)
+        all_results = await dorker.execute_query(query, min_page, max_page)
         print(f"\n  DITEMUKAN {len(all_results)} HASIL UNIK")
         save_path = dorker.save_json(output_file, [{"query": query, "total_results": len(all_results), "data": all_results}])
         print(f"\n[Tersimpan] {save_path}")
         dorker.print_stats()
     finally:
-        dorker.close_browser()
+        await dorker.close_browser()
 
 
-def bulk_mode():
+async def bulk_mode():
     print("\n" + "=" * 60)
     print("  MODE BULK - Multiple Payloads dari .txt")
     print("=" * 60)
@@ -470,7 +515,7 @@ def bulk_mode():
 
     print("\nInisialisasi browser...")
     dorker = GoogleDorker(headless=not visible, delay=delay)
-    dorker.init_browser()
+    await dorker.init_browser()
     
     bulk_data = []
     total_found = 0
@@ -481,7 +526,7 @@ def bulk_mode():
             print(f"  [{i}/{len(queries)}] Eksekusi: {query}")
             print(f"{'='*60}")
             
-            results = dorker.execute_query(query, min_page, max_page)
+            results = await dorker.execute_query(query, min_page, max_page)
             total_found += len(results)
             
             bulk_data.append({
@@ -493,7 +538,7 @@ def bulk_mode():
             if i < len(queries):
                 wait_time = delay * 2 + random.uniform(2.0, 5.0)
                 print(f"  Cooldown {wait_time:.1f}s sebelum payload berikutnya...")
-                time.sleep(wait_time)
+                await asyncio.sleep(wait_time)
                 
         print("\n" + "=" * 60)
         print(f"  BULK SELESAI | TOTAL HASIL UNIK: {total_found}")
@@ -503,12 +548,12 @@ def bulk_mode():
         print(f"\n[Tersimpan] {save_path}")
         dorker.print_stats()
     finally:
-        dorker.close_browser()
+        await dorker.close_browser()
 
 
-def main_menu():
+async def main_menu():
     print("=" * 60)
-    print("  GOOGLE DORKING CLI (SELENIUM)")
+    print("  GOOGLE DORKING CLI")
     print("=" * 60)
     print("\nPilih Mode:")
     print("[1] Mode Interaktif (Single Query)")
@@ -518,11 +563,11 @@ def main_menu():
     choice = input("\nMasukkan pilihan (1/2/3): ").strip()
     
     if choice == '2':
-        bulk_mode()
+        await bulk_mode()
     elif choice == '1':
-        interactive_mode()
+        await interactive_mode()
     else:
         print("Keluar...")
 
 if __name__ == "__main__":
-    main_menu()
+    asyncio.run(main_menu())
