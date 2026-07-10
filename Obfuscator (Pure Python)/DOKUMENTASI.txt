@@ -59,7 +59,7 @@ Entry point ketiga: membungkus fungsi encode/decode/obfuscate sebagai HTTP API
 sekaligus menyajikan halaman web. Jalankan:
 
     pip install flask          (sekali saja; lihat requirements.txt)
-    python3 app.py             (buka http://127.0.0.1:5000/)
+    python3 app.py             (buka http://127.0.0.1:8000/)
 
 Endpoint (detail di README_api.md):
 - GET  /               — halaman web (form).

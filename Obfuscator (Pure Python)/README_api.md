@@ -20,7 +20,7 @@ cd "Obfuscator (Pure Python)"
 ./venv/bin/python app.py
 ```
 
-Server jalan di **http://127.0.0.1:5000/**. Buka di browser untuk memakai form,
+Server jalan di **http://127.0.0.1:8000/**. Buka di browser untuk memakai form,
 atau panggil endpoint langsung dengan `curl`/Postman.
 
 Berkas halaman web dipisah dari `app.py`:
@@ -108,23 +108,23 @@ Meng-obfuscate kode. Mendukung tipe **js, css, py, html**.
 
 ```bash
 # Encode + Decode sekaligus (satu input, dua hasil)
-curl -X POST http://127.0.0.1:5000/api/translate \
+curl -X POST http://127.0.0.1:8000/api/translate \
   -H 'Content-Type: application/json' -d '{"text":"halo"}'
 
 # Encode
-curl -X POST http://127.0.0.1:5000/api/encode \
+curl -X POST http://127.0.0.1:8000/api/encode \
   -H 'Content-Type: application/json' -d '{"text":"halo"}'
 
 # Decode
-curl -X POST http://127.0.0.1:5000/api/decode \
+curl -X POST http://127.0.0.1:8000/api/decode \
   -H 'Content-Type: application/json' -d '{"text":"aGFsbw=="}'
 
 # Obfuscate via JSON
-curl -X POST http://127.0.0.1:5000/api/obfuscate \
+curl -X POST http://127.0.0.1:8000/api/obfuscate \
   -H 'Content-Type: application/json' -d '{"code":"print(1+1)","type":"py"}'
 
 # Obfuscate via upload file (tipe auto dari ekstensi)
-curl -X POST http://127.0.0.1:5000/api/obfuscate -F 'file=@Example/jstester.js'
+curl -X POST http://127.0.0.1:8000/api/obfuscate -F 'file=@Example/jstester.js'
 ```
 
 ---
