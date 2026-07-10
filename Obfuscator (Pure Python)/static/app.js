@@ -92,7 +92,8 @@ function copyText(text, btn) {
 
 // ---- Render hasil encode/decode per metode -------------------------------
 function renderSection(label, obj) {
-  const frag = document.createDocumentFragment();
+  const sect = document.createElement("div");
+  sect.className = "sect";
   const entries = Object.entries(obj);
   let ok = 0, fail = 0;
   entries.forEach(function (e) { e[1].ok ? ok++ : fail++; });
@@ -101,7 +102,7 @@ function renderSection(label, obj) {
   head.className = "sect-label";
   head.textContent = label + " · " + ok + " berhasil"
     + (fail ? ", " + fail + " gagal" : "");
-  frag.appendChild(head);
+  sect.appendChild(head);
 
   for (const [name, item] of entries) {
     const row = document.createElement("div");
@@ -132,9 +133,9 @@ function renderSection(label, obj) {
       row.appendChild(send);
       row.appendChild(btn);
     }
-    frag.appendChild(row);
+    sect.appendChild(row);
   }
-  return frag;
+  return sect;
 }
 
 // ---- Encode & Decode -----------------------------------------------------
