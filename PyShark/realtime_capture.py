@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 import threading
 from datetime import datetime
@@ -66,6 +67,15 @@ class RealtimeCaptureWriter:
             print(f"[!] Gagal menulis ke {self.output_path}: {e}", file=sys.stderr)
 
 
+ASCII_STRING_PATTERN = re.compile(rb"[\x20-\x7e]{4,}")
+
+
+def extract_ascii_strings(raw_bytes) -> list:
+    if not raw_bytes:
+        return []
+    return [m.decode("ascii", errors="ignore") for m in ASCII_STRING_PATTERN.findall(raw_bytes)]
+
+
 def layer_to_dict(layer) -> dict:
     fields = {}
     for field_name in layer.field_names:
@@ -85,10 +95,17 @@ def packet_to_dict(pkt) -> dict:
         "length": pkt.length if hasattr(pkt, "length") else None,
         "highest_layer": pkt.highest_layer if hasattr(pkt, "highest_layer") else None,
         "layers": {},
+        "ascii_strings": [],
     }
 
     for layer in pkt.layers:
         record["layers"][layer.layer_name] = layer_to_dict(layer)
+
+    try:
+        raw_bytes = pkt.get_raw_packet()
+        record["ascii_strings"] = extract_ascii_strings(raw_bytes)
+    except Exception:
+        record["ascii_strings"] = []
 
     return record
 
@@ -111,7 +128,7 @@ def main():
     )
     writer.start()
 
-    capture_kwargs = {"interface": args.interface}
+    capture_kwargs = {"interface": args.interface, "include_raw": True, "use_json": True}
     if args.filter:
         capture_kwargs["bpf_filter"] = args.filter
 
