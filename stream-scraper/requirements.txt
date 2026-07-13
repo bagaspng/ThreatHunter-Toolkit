@@ -1,0 +1,6 @@
+Flask
+requests
+beautifulsoup4
+lxml
+websocket-client
+flask-sock

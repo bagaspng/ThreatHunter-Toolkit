@@ -12,3 +12,5 @@ fastapi
 uvicorn
 curl-cffi
 flask
+websocket-client
+flask-sock
