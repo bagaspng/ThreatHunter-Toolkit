@@ -66,10 +66,13 @@ Endpoint (detail di README_api.md):
 - POST /api/translate  — encode DAN decode sekaligus dari satu input.
 - POST /api/encode     — encode ke semua metode.
 - POST /api/decode     — decode dari semua metode.
+- POST /api/peel       — kupas encoding berlapis sampai habis ("Kupas semua").
 - POST /api/obfuscate  — obfuscate kode (js/css/py/html); JSON atau upload file.
 
 Fitur halaman web: hasil encode/decode per-metode dengan salin selektif dan
-tombol "-> input" (chaining), Live mode (default aktif), penyembunyian metode
+tombol "-> input" (chaining), petunjuk decode berlapis (pil "mungkin masih
+<jenis>" + tombol "Decode lagi"/"Kupas semua"), Live mode (default aktif),
+penyembunyian metode
 decode gagal + toggle "tampilkan yang gagal", unggah / seret (drag & drop) file &
 unduh hasil obfuscate, counter karakter/byte, tombol bersihkan, pintasan
 Ctrl/Cmd+Enter, indikator loading, notifikasi toast, favicon, dan tampilan
@@ -263,6 +266,15 @@ Kebalikan encoder.py.
 - from_base64(text), from_base32(text), from_hex(text),
   from_binary(text), from_url(text), from_unicode_escape(text),
   from_ascii(text).
+
+
+>> layer_hint.py
+Deteksi "apakah hasil decode masih bisa di-decode lagi" (encoding berlapis).
+Dipakai bersama app.py dan main.py. Heuristik: cocok pola -> berhasil decode ->
+hasil teks bermakna dan berbeda dari input.
+- next_layer(text) — (nama, hasil) lapisan berikutnya, atau None.
+- hint(text) — {"again": bool, "guess": nama|None} untuk pil petunjuk.
+- peel(text) — kupas berulang; daftar [(nama, hasil), ...].
 
 
 >> hasher.py

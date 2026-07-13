@@ -60,11 +60,13 @@ Endpoint (detail di `README_api.md`):
 - `POST /api/translate`  — encode **dan** decode sekaligus dari satu input.
 - `POST /api/encode`     — encode ke semua metode.
 - `POST /api/decode`     — decode dari semua metode.
+- `POST /api/peel`       — kupas encoding berlapis sampai habis (untuk "Kupas semua").
 - `POST /api/obfuscate`  — obfuscate kode (js/css/py/html); terima JSON atau upload file.
 
 Fitur halaman web: hasil encode/decode per-metode dengan **salin selektif** &
-**→ input** (chaining), **Live mode** (default aktif), penyembunyian metode
-decode gagal + toggle "tampilkan yang gagal", **unggah / seret file** & **unduh
+**→ input** (chaining), **petunjuk decode berlapis** (pil "↻ mungkin masih {jenis}"
++ tombol "Decode lagi"/"Kupas semua"), **Live mode** (default aktif), penyembunyian
+metode decode gagal + toggle "tampilkan yang gagal", **unggah / seret file** & **unduh
 hasil** obfuscate, counter karakter/byte, tombol bersihkan, pintasan Ctrl/Cmd+Enter,
 indikator loading, notifikasi toast, favicon, dan tampilan responsif.
 HTML/CSS/JS halaman dipisah: `templates/index.html`, `static/style.css`,
@@ -242,6 +244,14 @@ Kebalikan `encoder.py`.
 - `from_base64(text)`, `from_base32(text)`, `from_hex(text)`,
   `from_binary(text)`, `from_url(text)`, `from_unicode_escape(text)`,
   `from_ascii(text)`.
+
+### `layer_hint.py`
+Deteksi "apakah sebuah hasil decode masih bisa di-decode lagi" (encoding berlapis).
+Dipakai bersama oleh `app.py` dan `main.py`. Heuristik: sebuah lapisan diakui bila
+cocok pola → berhasil di-decode → hasilnya teks bermakna dan berbeda dari input.
+- `next_layer(text)` — kembalikan `(nama, hasil)` lapisan berikutnya, atau `None`.
+- `hint(text)` — `{"again": bool, "guess": nama|None}` untuk pil petunjuk.
+- `peel(text)` — kupas berulang; kembalikan daftar `[(nama, hasil), ...]`.
 
 ### `hasher.py`
 Menghitung hash/checksum dari teks.

@@ -33,6 +33,10 @@ Berkas halaman web dipisah dari `app.py`:
 
 - **Encode & Decode** per-metode dengan tombol **Salin** selektif tiap metode,
   plus tombol **→ input** untuk mengirim hasil kembali ke input (chaining).
+- **Petunjuk decode berlapis** — kalau sebuah hasil decode masih tampak ter-encode
+  (mis. base64 di dalam base64), muncul pil **"↻ mungkin masih {jenis}"** dengan
+  tombol **Decode lagi** (kupas selapis) dan **Kupas semua** (tampilkan seluruh
+  rantai sampai pesan akhir). Bersifat heuristik ("mungkin"), hanya pada hasil decode.
 - **Live mode** (default aktif) — hasil diperbarui otomatis saat mengetik.
 - Metode **decode yang gagal disembunyikan** secara default (label menampilkan
   jumlah berhasil/gagal); ada toggle **"Tampilkan yang gagal"**.
@@ -62,6 +66,9 @@ oleh form web: satu input, dua hasil langsung muncul.
     "decode": { "base64": { "ok": false, "error": "..." } }
   }
   ```
+- Tiap hasil **decode** yang berhasil diberi field `hint` bila hasilnya masih bisa
+  di-decode lagi: `"hint": { "again": true, "guess": "base64" }` (atau
+  `{ "again": false }`).
 
 ### `POST /api/encode`
 Meng-encode teks ke **semua** metode sekaligus.
@@ -84,7 +91,28 @@ Kebalikan dari encode, dengan bentuk input/output yang sama. Metode yang tidak
 cocok dengan input ditandai `"ok": false` dan pesan error-nya, tanpa meng-crash.
 
 - **Input** (JSON): `{"text": "aGFsbw=="}`
-- **Output**: `results.base64 = { "ok": true, "value": "halo" }`
+- **Output**: `results.base64 = { "ok": true, "value": "halo" }` (tiap hasil berhasil
+  juga memuat `hint`, lihat `/api/translate`).
+
+### `POST /api/peel`
+Mengupas encoding **berlapis** sampai habis (dipakai tombol **Kupas semua**).
+Secara serakah mendeteksi & men-decode lapis demi lapis (base64/base32/hex/biner/
+url/unicode/ascii) sampai hasilnya bukan encoding lagi.
+
+- **Input** (JSON): `{"text": "WkZjMWNHSkhSbkZaV0d4bw=="}`
+- **Output**:
+  ```json
+  {
+    "input": "WkZjMWNHSkhSbkZaV0d4bw==",
+    "steps": [
+      { "name": "base64", "value": "ZFc1cGJHRnFZWGxo" },
+      { "name": "base64", "value": "dW5pbGFqYXlh" },
+      { "name": "base64", "value": "unilajaya" }
+    ],
+    "final": "unilajaya"
+  }
+  ```
+- Kalau tak ada lapisan yang terdeteksi, `steps` kosong dan `final` = input.
 
 ### `POST /api/obfuscate`
 Meng-obfuscate kode. Mendukung tipe **js, css, py, html**.
@@ -118,6 +146,10 @@ curl -X POST http://127.0.0.1:8000/api/encode \
 # Decode
 curl -X POST http://127.0.0.1:8000/api/decode \
   -H 'Content-Type: application/json' -d '{"text":"aGFsbw=="}'
+
+# Kupas encoding berlapis sampai habis
+curl -X POST http://127.0.0.1:8000/api/peel \
+  -H 'Content-Type: application/json' -d '{"text":"WkZjMWNHSkhSbkZaV0d4bw=="}'
 
 # Obfuscate via JSON
 curl -X POST http://127.0.0.1:8000/api/obfuscate \
