@@ -6,6 +6,7 @@ No parsing/extraction logic belongs here.
 
 import json
 import logging
+import time
 from pathlib import Path
 
 import requests
@@ -21,15 +22,22 @@ DEFAULT_HEADERS = {
 }
 
 
-def download_html(url: str, timeout: int = 10) -> str:
-    """Download raw HTML from a target URL."""
+def download_html(url: str, timeout: int = 10, retries: int = 3) -> str:
+    """Download raw HTML from a target URL with retry on rate-limit errors."""
     logger.info(f"Downloading HTML from {url}")
     headers = DEFAULT_HEADERS.copy()
     if "lihatcctv.com" in url:
         headers["Referer"] = "https://restabandarlampung.lampung.polri.go.id/"
-    response = requests.get(url, headers=headers, timeout=timeout)
-    response.raise_for_status()
-    return response.text
+    for attempt in range(retries):
+        response = requests.get(url, headers=headers, timeout=timeout)
+        if response.status_code == 429:
+            wait = 5 * (attempt + 1)
+            logger.warning(f"429 Too Many Requests — menunggu {wait}s sebelum retry... ({url})")
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        return response.text
+    raise Exception(f"Gagal download setelah {retries} percobaan: {url}")
 
 
 def save_json(data: dict, output_path: str) -> None:
