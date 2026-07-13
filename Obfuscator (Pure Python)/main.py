@@ -1,5 +1,6 @@
 from modules import encoder
 from modules import decoder
+from modules import layer_hint
 from modules import hasher
 from modules import detector
 from modules import batch_processor
@@ -29,10 +30,15 @@ DECODE_METHODS = [
     ("ASCII Decode", decoder.from_ascii),
 ]
 
-def _print_results(methods, text):
+def _print_results(methods, text, hints=False):
     for name, fn in methods:
         try:
-            print(f"\n{name}:\n{fn(text)}")
+            value = fn(text)
+            print(f"\n{name}:\n{value}")
+            if hints:
+                h = layer_hint.hint(value)
+                if h["again"]:
+                    print(f"         ↻ mungkin masih {h['guess']}")
         except Exception as e:
             print(f"\n{name}:\n[gagal] {e}")
 
@@ -47,7 +53,15 @@ def translate_menu():
     print("\n=== HASIL ENCODE ===")
     _print_results(ENCODE_METHODS, text)
     print("\n=== HASIL DECODE ===")
-    _print_results(DECODE_METHODS, text)
+    _print_results(DECODE_METHODS, text, hints=True)
+    steps = layer_hint.peel(text)
+    if steps:
+        ans = input("\nKupas sampai habis? [y/N]: ").strip().lower()
+        if ans == "y":
+            print()
+            for i, (name, value) in enumerate(steps, 1):
+                print(f"  lapis {i} ({name}) -> {value}")
+            print(f"\nPesan akhir: {steps[-1][1]}")
     utils.pause()
 
 def hash_menu():

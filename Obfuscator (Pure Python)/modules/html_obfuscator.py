@@ -20,10 +20,6 @@ def _build_loader(combined, expected_checksum):
         + "var parts=" + split + "(P);"
         + "var h=" + dec + "(parts[0],parts[1]);"
         + "document.open();document.write(h);document.close();"
-        # Pembersih jejak tahan-async: jalan setelah semua script (termasuk
-        # eksternal/CDN yang parser-blocking) selesai dieksekusi, lalu memantau
-        # script yang muncul belakangan. Script dihapus SETELAH sempat jalan,
-        # supaya fungsionalitas halaman tidak rusak.
         + "var _cl=false;"
         + "function _rm(n){if(n&&n.parentNode){n.parentNode.removeChild(n);}}"
         + "function _sweep(){try{"

@@ -1,30 +1,19 @@
 #!/usr/bin/env python3
-"""Web API (Flask) untuk Obfuscator (Pure Python).
 
-Entry point KETIGA — melengkapi:
-  - main.py       : menu interaktif di terminal
-  - obfuscate.py  : CLI non-interaktif
-  - app.py (ini)  : Web API + halaman form, diakses lewat HTTP
-
-app.py hanya "kulit" web; semua logika tetap memakai modul di folder modules/.
-Halaman web ada di templates/index.html.
-
-Menjalankan:
-    python3 app.py
-Lalu buka http://127.0.0.1:8000/ di browser.
-"""
+import base64
 
 from flask import Flask, jsonify, request, render_template
 
 from modules import encoder
 from modules import decoder
+from modules import layer_hint
 from modules import js_obfuscator
 from modules import css_obfuscator
 from modules import py_obfuscator
+from modules import stego
 
 app = Flask(__name__)
 
-# --- Daftar metode: dipetakan sekali, dipakai ulang oleh endpoint ---------
 ENCODE_METHODS = {
     "base64": encoder.to_base64,
     "base32": encoder.to_base32,
@@ -46,28 +35,18 @@ DECODE_METHODS = {
 }
 
 
-# --- Helper input: terima JSON, form biasa, atau upload file --------------
 def get_payload(*keys):
-    """Ambil teks dari body request.
-
-    Prioritas: file yang di-upload -> JSON -> form biasa.
-    `keys` adalah nama field yang dicari (mis. "text" atau "code").
-    Mengembalikan (teks, nama_file) — nama_file bisa None.
-    """
-    # 1) Upload file (multipart/form-data, field bernama "file")
     if "file" in request.files:
         f = request.files["file"]
         if f and f.filename:
             return f.read().decode("utf-8", errors="replace"), f.filename
 
-    # 2) Body JSON
     if request.is_json:
         data = request.get_json(silent=True) or {}
         for k in keys:
             if data.get(k):
                 return data[k], None
 
-    # 3) Form biasa (application/x-www-form-urlencoded)
     for k in keys:
         if request.form.get(k):
             return request.form[k], None
@@ -76,7 +55,6 @@ def get_payload(*keys):
 
 
 def _run_methods(methods, text):
-    """Jalankan semua metode; metode yang gagal ditandai, tidak meng-crash."""
     results = {}
     for name, fn in methods.items():
         try:
@@ -86,7 +64,13 @@ def _run_methods(methods, text):
     return results
 
 
-# --- Endpoint API ---------------------------------------------------------
+def _with_hints(results):
+    for item in results.values():
+        if item.get("ok"):
+            item["hint"] = layer_hint.hint(item["value"])
+    return results
+
+
 @app.route("/api/encode", methods=["POST"])
 def api_encode():
     text, _ = get_payload("text", "code")
@@ -100,24 +84,68 @@ def api_decode():
     text, _ = get_payload("text", "code")
     if not text:
         return jsonify({"error": "Field 'text' kosong."}), 400
-    return jsonify({"input": text, "results": _run_methods(DECODE_METHODS, text)})
+    return jsonify({"input": text,
+                    "results": _with_hints(_run_methods(DECODE_METHODS, text))})
 
 
 @app.route("/api/translate", methods=["POST"])
 def api_translate():
-    """Encode DAN decode sekaligus dari satu input (gaya dencode)."""
     text, _ = get_payload("text", "code")
     if not text:
         return jsonify({"error": "Field 'text' kosong."}), 400
     return jsonify({
         "input": text,
         "encode": _run_methods(ENCODE_METHODS, text),
-        "decode": _run_methods(DECODE_METHODS, text),
+        "decode": _with_hints(_run_methods(DECODE_METHODS, text)),
     })
 
 
+@app.route("/api/peel", methods=["POST"])
+def api_peel():
+    text, _ = get_payload("text", "code")
+    if not text:
+        return jsonify({"error": "Field 'text' kosong."}), 400
+    steps = layer_hint.peel(text)
+    return jsonify({
+        "input": text,
+        "steps": [{"name": n, "value": v} for n, v in steps],
+        "final": steps[-1][1] if steps else text,
+    })
+
+
+@app.route("/api/stego/encode", methods=["POST"])
+def api_stego_encode():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "Gambar PNG belum diunggah."}), 400
+    message = request.form.get("message", "")
+    if not message:
+        return jsonify({"error": "Pesan kosong."}), 400
+    try:
+        out = stego.encode(f.read(), message)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    data_url = "data:image/png;base64," + base64.b64encode(out).decode("ascii")
+    return jsonify({"image": data_url, "bytes": len(out),
+                    "message_len": len(message.encode("utf-8"))})
+
+
+@app.route("/api/stego/decode", methods=["POST"])
+def api_stego_decode():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "Gambar PNG belum diunggah."}), 400
+    try:
+        message = stego.decode(f.read())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    score = stego.readability(message)
+    readable = bool(message) and score >= 0.85
+    return jsonify({"message": message, "readable": readable,
+                    "score": round(score * 100)})
+
+
 def _detect_type(explicit, filename):
-    """Tentukan tipe obfuscate dari field 'type' atau ekstensi file."""
     if explicit:
         return explicit.lower()
     if filename:
@@ -161,7 +189,6 @@ def api_obfuscate():
         return jsonify({"error": str(e)}), 500
 
 
-# --- Halaman web ----------------------------------------------------------
 @app.route("/")
 def index():
     return render_template("index.html")

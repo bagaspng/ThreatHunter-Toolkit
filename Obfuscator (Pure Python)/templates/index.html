@@ -63,6 +63,53 @@
       </div>
       <pre id="ob-out" class="empty">Hasil obfuscate akan muncul di sini.</pre>
     </section>
+
+    <section class="card" id="st-card">
+      <div class="card-head"><h2>Steganografi</h2><span>sembunyikan pesan di gambar PNG (LSB)</span></div>
+      <div class="seg" id="st-mode">
+        <button type="button" class="seg-btn active" data-val="encode">Sisipkan pesan</button>
+        <button type="button" class="seg-btn" data-val="decode">Ekstrak pesan</button>
+      </div>
+
+      <div id="st-encode-pane">
+        <label class="small" style="margin-top:.95rem">Gambar PNG pembawa</label>
+        <div class="row">
+          <label class="file-btn">Pilih gambar PNG
+            <input type="file" id="st-enc-file" accept="image/png" hidden>
+          </label>
+          <span class="file-name" id="st-enc-name"></span>
+        </div>
+        <label class="small" for="st-msg" style="margin-top:.95rem">Pesan rahasia</label>
+        <textarea id="st-msg" placeholder="Ketik pesan yang mau disembunyikan di dalam gambar..."></textarea>
+        <div class="counter" id="st-msg-count">0 karakter · 0 byte</div>
+        <div class="row">
+          <button class="btn" id="st-enc-run" onclick="stegoEncode()">Sisipkan &amp; buat gambar</button>
+          <button class="btn ghost" onclick="clearStego()">Bersihkan</button>
+        </div>
+      </div>
+
+      <div id="st-decode-pane" hidden>
+        <label class="small" style="margin-top:.95rem">Gambar PNG berisi pesan</label>
+        <div class="row">
+          <label class="file-btn">Pilih gambar PNG
+            <input type="file" id="st-dec-file" accept="image/png" hidden>
+          </label>
+          <span class="file-name" id="st-dec-name"></span>
+        </div>
+        <div class="row">
+          <button class="btn" id="st-dec-run" onclick="stegoDecode()">Ekstrak pesan</button>
+          <button class="btn ghost" onclick="clearStego()">Bersihkan</button>
+        </div>
+      </div>
+
+      <div class="result-head">
+        <span class="meta" id="st-meta">Hasil</span>
+        <div class="result-actions">
+          <button class="dl" id="st-dl" onclick="downloadStego()" disabled>Unduh PNG</button>
+        </div>
+      </div>
+      <div id="st-out" class="results empty">Hasil steganografi akan muncul di sini.</div>
+    </section>
     </div>
 
     <footer>Berjalan di <code>127.0.0.1:8000</code> · logika di <code>modules/</code></footer>

@@ -5,12 +5,16 @@ const edLive = document.getElementById("ed-live");
 const obInput = document.getElementById("ob-input");
 const obFile = document.getElementById("ob-file");
 const obCard = document.getElementById("ob-card");
+// EXT: deteksi tipe dari ekstensi file saat UPLOAD (.css -> obfuscate CSS).
 const EXT = { js: "js", css: "css", py: "py", html: "html", htm: "html" };
+// Nama & MIME file saat UNDUH. Catatan: obfuscate CSS menghasilkan JavaScript
+// (injector yang menyuntik CSS ke DOM), jadi diunduh sebagai .css.js — bukan .css.
 const DL_NAME = { js: "obfuscated.js", css: "obfuscated.css.js",
                   py: "obfuscated.py", html: "obfuscated.html" };
 const DL_MIME = { js: "text/javascript", css: "text/javascript",
                   py: "text/x-python", html: "text/html" };
 
+// ---- Toast ---------------------------------------------------------------
 function toast(msg) {
   const wrap = document.getElementById("toast-wrap");
   const t = document.createElement("div");
@@ -24,6 +28,7 @@ function toast(msg) {
   }, 1600);
 }
 
+// ---- Counter karakter/byte ----------------------------------------------
 function byteLen(s) { return new TextEncoder().encode(s).length; }
 function updateCounter(inputId, countId) {
   const v = document.getElementById(inputId).value;
@@ -31,6 +36,7 @@ function updateCounter(inputId, countId) {
     v.length + " karakter · " + byteLen(v) + " byte";
 }
 
+// ---- Segmented control (tipe obfuscate) ----------------------------------
 document.querySelectorAll("#ob-type .seg-btn").forEach(function (b) {
   b.addEventListener("click", function () { setType(b.dataset.val); });
 });
@@ -43,6 +49,7 @@ function obType() {
   return document.querySelector("#ob-type .seg-btn.active").dataset.val;
 }
 
+// ---- Output helpers ------------------------------------------------------
 function setOut(id, text, empty) {
   const el = document.getElementById(id);
   el.textContent = text;
@@ -62,6 +69,7 @@ function loading(btnId, on) {
   if (b) b.classList.toggle("loading", on);
 }
 
+// ---- Copy ----------------------------------------------------------------
 async function copyOut(id) {
   const el = document.getElementById(id);
   if (el.classList.contains("empty")) return;
@@ -82,6 +90,7 @@ function copyText(text, btn) {
   }).catch(function () {});
 }
 
+// ---- Render hasil encode/decode per metode -------------------------------
 function renderSection(label, obj, isDecode) {
   const sect = document.createElement("div");
   sect.className = "sect";
@@ -125,6 +134,7 @@ function renderSection(label, obj, isDecode) {
       row.appendChild(btn);
     }
     sect.appendChild(row);
+    // Petunjuk "mungkin masih bisa di-decode lagi" hanya untuk hasil Decode.
     if (isDecode && item.ok && item.hint && item.hint.again) {
       sect.appendChild(makeHint(item.value, item.hint));
     }
@@ -132,6 +142,7 @@ function renderSection(label, obj, isDecode) {
   return sect;
 }
 
+// Kirim sebuah nilai ke kotak input lalu proses ulang (dipakai beberapa tombol).
 function sendToInput(value) {
   edInput.value = value;
   updateCounter("ed-input", "ed-count");
@@ -139,6 +150,7 @@ function sendToInput(value) {
   edInput.focus();
 }
 
+// Baris petunjuk: pil "mungkin masih <jenis>" + tombol "Decode lagi" & "Kupas semua".
 function makeHint(value, hint) {
   const bar = document.createElement("div");
   bar.className = "hintbar";
@@ -163,6 +175,7 @@ function makeHint(value, hint) {
   return bar;
 }
 
+// Panggil /api/peel lalu tampilkan seluruh rantai lapisan di bawah baris petunjuk.
 async function runPeel(value, bar) {
   try {
     const res = await fetch("/api/peel", {
@@ -212,6 +225,7 @@ function renderChain(bar, steps) {
   bar.parentNode.insertBefore(box, bar.nextSibling);
 }
 
+// ---- Encode & Decode -----------------------------------------------------
 async function translateText() {
   const out = document.getElementById("ed-out");
   const text = edInput.value;
@@ -248,6 +262,7 @@ function clearEd() {
   edInput.focus();
 }
 
+// Live mode: proses otomatis saat mengetik (debounce)
 let edTimer = null;
 edInput.addEventListener("input", function () {
   updateCounter("ed-input", "ed-count");
@@ -258,16 +273,19 @@ edInput.addEventListener("input", function () {
 edLive.addEventListener("change", function () {
   if (edLive.checked && edInput.value) translateText();
 });
+// Toggle "tampilkan yang gagal"
 document.getElementById("ed-showfail").addEventListener("change", function (e) {
   document.getElementById("ed-out").classList.toggle("show-fail", e.target.checked);
 });
+// Ctrl/Cmd+Enter untuk memproses
 edInput.addEventListener("keydown", function (e) {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     e.preventDefault(); translateText();
   }
 });
 
-let lastObf = null;
+// ---- Obfuscate -----------------------------------------------------------
+let lastObf = null; // { result, type }
 
 function loadFile(f) {
   if (!f) return;
@@ -284,6 +302,7 @@ function loadFile(f) {
 }
 obFile.addEventListener("change", function () { loadFile(obFile.files[0]); });
 
+// Drag & drop file ke kartu Obfuscate
 ["dragenter", "dragover"].forEach(function (ev) {
   obCard.addEventListener(ev, function (e) {
     e.preventDefault();
@@ -365,11 +384,13 @@ function downloadResult() {
   toast("File diunduh");
 }
 
+// ---- Steganografi (LSB gambar) -------------------------------------------
 const stMsg = document.getElementById("st-msg");
 const stEncFile = document.getElementById("st-enc-file");
 const stDecFile = document.getElementById("st-dec-file");
-let lastStego = null;
+let lastStego = null; // { dataUrl }
 
+// Ganti mode Sisipkan / Ekstrak
 document.querySelectorAll("#st-mode .seg-btn").forEach(function (b) {
   b.addEventListener("click", function () { setStegoMode(b.dataset.val); });
 });
@@ -409,6 +430,7 @@ function clearStego() {
   lastStego = null;
 }
 
+// Satu kolom perbandingan: judul + gambar (rasio asli terjaga).
 function stegoFigure(caption, src, revoke) {
   const fig = document.createElement("figure");
   fig.className = "st-figure";
@@ -489,6 +511,7 @@ async function stegoDecode() {
     document.getElementById("st-dl").disabled = true;
 
     if (!data.readable) {
+      // Bit LSB acak = tidak ada pesan wajar. Jangan tampilkan '�' yang menyesatkan.
       const note = document.createElement("div");
       note.className = "st-note st-empty";
       note.textContent = "Tidak ada pesan terbaca. Bit LSB gambar ini acak, jadi "
@@ -536,6 +559,7 @@ function downloadStego() {
   toast("Gambar diunduh");
 }
 
+// ---- Inisialisasi --------------------------------------------------------
 updateCounter("ed-input", "ed-count");
 updateCounter("ob-input", "ob-count");
 updateCounter("st-msg", "st-msg-count");
