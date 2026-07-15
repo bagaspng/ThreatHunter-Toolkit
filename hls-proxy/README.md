@@ -1,4 +1,4 @@
-# HLS Proxy (Flask Implementation)
+# HLS Proxy 
 
 An educational reverse-proxy server implemented in Flask to bypass anti-scraping,
 referrer validation, and Cloudflare protection (using `curl_cffi`) for HTTP Live
