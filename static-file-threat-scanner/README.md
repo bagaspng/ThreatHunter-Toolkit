@@ -2,6 +2,26 @@
 
 Static File Threat Scanner adalah perkakas baris perintah (CLI) berbasis Python untuk menganalisis dokumen dan gambar secara statis guna mendeteksi indikator ancaman keamanan (malware indicators). Scanner ini dirancang untuk membaca byte, struktur, metadata, dan string dalam file secara aman tanpa mengeksekusi file tersebut.
 
+## Struktur Direktori
+
+```txt
+├── config/              # Konfigurasi batas skor dan keparahan rules
+│   ├── rules.yaml
+│   └── thresholds.yaml
+├── src/                 # Source code utama aplikasi
+│   ├── analyzers/       # Parser spesifik file (pdf, png, jpg, svg, generic)
+│   ├── core/            # Logika inti (file_info, entropy, magic_detector, scoring, scanner)
+│   ├── detectors/       # Pendeteksi pola (url, base64, apk, suspicious_keyword)
+│   ├── reports/         # Pembangun format output (console, json, text)
+│   └── utils/           # Helper fungsi pembaca file & ekstraksi teks aman
+├── tests/               # Unit testing program
+├── main.py              # Titik masuk utama program (CLI Entry Point)
+├── requirements.txt     # Daftar dependensi modul Python
+└── .gitignore           # File pengabaian git
+```
+
+---
+
 ## Fitur Utama
 
 - **Deteksi Ketidaksesuaian Ekstensi**: Memeriksa kesesuaian antara ekstensi file dengan tipe aslinya (magic bytes).
@@ -94,25 +114,7 @@ python main.py scan <path_ke_file> --text
 
 ---
 
-## Struktur Direktori
 
-```txt
-├── config/              # Konfigurasi batas skor dan keparahan rules
-│   ├── rules.yaml
-│   └── thresholds.yaml
-├── src/                 # Source code utama aplikasi
-│   ├── analyzers/       # Parser spesifik file (pdf, png, jpg, svg, generic)
-│   ├── core/            # Logika inti (file_info, entropy, magic_detector, scoring, scanner)
-│   ├── detectors/       # Pendeteksi pola (url, base64, apk, suspicious_keyword)
-│   ├── reports/         # Pembangun format output (console, json, text)
-│   └── utils/           # Helper fungsi pembaca file & ekstraksi teks aman
-├── tests/               # Unit testing program
-├── main.py              # Titik masuk utama program (CLI Entry Point)
-├── requirements.txt     # Daftar dependensi modul Python
-└── .gitignore           # File pengabaian git
-```
-
----
 
 ## Keamanan & Aturan Keselamatan
 
