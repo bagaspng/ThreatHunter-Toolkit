@@ -24,7 +24,7 @@ hls/
 └── README.md
 ```
 
-## How It Works (Request Flow)
+## How It Works 
 
 ```text
   Browser (player.html + hls.js)          Flask Proxy                 Upstream CDN (Vault)
