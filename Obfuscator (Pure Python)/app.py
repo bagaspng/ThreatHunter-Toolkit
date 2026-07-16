@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import base64
+import json
 
 from flask import Flask, jsonify, request, render_template
 
@@ -11,6 +12,7 @@ from modules import js_obfuscator
 from modules import css_obfuscator
 from modules import py_obfuscator
 from modules import stego
+from modules import jwt_tool
 
 app = Flask(__name__)
 
@@ -143,6 +145,46 @@ def api_stego_decode():
     readable = bool(message) and score >= 0.85
     return jsonify({"message": message, "readable": readable,
                     "score": round(score * 100)})
+
+
+@app.route("/api/jwt/decode", methods=["POST"])
+def api_jwt_decode():
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or request.form.get("token") or "").strip()
+    if not token:
+        return jsonify({"error": "Field 'token' kosong."}), 400
+    try:
+        info = jwt_tool.decode(token)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    secret = data.get("secret", request.form.get("secret"))
+    if secret is not None and secret != "":
+        info["verify"] = jwt_tool.verify(token, secret)
+    else:
+        info["verify"] = None
+    return jsonify(info)
+
+
+@app.route("/api/jwt/encode", methods=["POST"])
+def api_jwt_encode():
+    data = request.get_json(silent=True) or {}
+    payload = data.get("payload")
+    secret = data.get("secret")
+    if payload is None:
+        return jsonify({"error": "Field 'payload' kosong."}), 400
+    if not secret:
+        return jsonify({"error": "Field 'secret' kosong."}), 400
+    algorithm = data.get("algorithm", "HS256")
+    header = data.get("header")
+    try:
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        if isinstance(header, str) and header.strip():
+            header = json.loads(header)
+        token = jwt_tool.encode(payload, secret, algorithm, header=header)
+    except (ValueError, json.JSONDecodeError) as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"token": token, "algorithm": algorithm})
 
 
 def _detect_type(explicit, filename):

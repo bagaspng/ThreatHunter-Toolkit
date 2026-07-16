@@ -67,6 +67,10 @@ Endpoint (detail di README_api.md):
 - POST /api/encode     — encode ke semua metode.
 - POST /api/decode     — decode dari semua metode.
 - POST /api/peel       — kupas encoding berlapis sampai habis ("Kupas semua").
+- POST /api/stego/encode — sisipkan pesan ke bit LSB gambar PNG (upload file).
+- POST /api/stego/decode — ekstrak pesan LSB dari gambar PNG.
+- POST /api/jwt/decode   — baca header/payload/klaim JWT + verifikasi signature (HMAC).
+- POST /api/jwt/encode   — buat & tanda tangani token JWT baru (HS256/384/512).
 - POST /api/obfuscate  — obfuscate kode (js/css/py/html); JSON atau upload file.
 
 Fitur halaman web: hasil encode/decode per-metode dengan salin selektif dan
@@ -88,6 +92,8 @@ static/app.js.
     Obfuscator (Pure Python)/
     ├── main.py               # menu interaktif (terminal)
     ├── obfuscate.py          # CLI non-interaktif
+    ├── stego_umum.py         # CLI ekstraktor pesan LSB pada PNG
+    ├── jwt_umum.py           # CLI JWT (decode/verify/encode)
     ├── app.py                # Web API + halaman web (Flask)
     ├── requirements.txt      # dependency (flask; markdown untuk build PDF)
     ├── templates/            # index.html (halaman web)
@@ -390,6 +396,24 @@ Proteksi integritas payload HTML.
 Verifikasi hasil obfuscation HTML.
 - verify(final_html, expected_rendered) — kembalikan (ok, pesan); memastikan
   struktur output benar dan skema decode round-trip identik dengan input.
+
+
+>> stego.py
+Steganografi LSB pada PNG, murni stdlib (struct + zlib, tanpa Pillow).
+- read_png_rgba(data) / write_png_rgba(w, h, rgba) — baca/tulis PNG ke/dari RGBA.
+- encode(png_bytes, message) — sisipkan pesan pada bit LSB channel R,G,B.
+- decode(png_bytes) — rangkai kembali pesan dari bit LSB.
+- readability(text) — skor keterbacaan untuk menandai hasil yang bukan teks.
+
+
+>> jwt_tool.py
+Perkakas JWT murni stdlib (hmac + hashlib + base64 + json), HMAC HS256/384/512.
+- decode(token) — pisah 3 bagian: header, payload, signature, algoritma, dan klaim
+  standar (exp/iat/nbf ditafsirkan jadi waktu + status berlaku).
+- verify(token, secret) — hitung ulang HMAC lalu bandingkan konstan-waktu
+  (hmac.compare_digest); kembalikan {verified, algorithm, reason}.
+- encode(payload, secret, algorithm, header) — susun & tanda tangani token baru.
+- b64url_encode/decode — base64url tanpa padding sesuai spesifikasi JWT.
 
 ==========================================================================
 
