@@ -1,171 +1,308 @@
+#!/usr/bin/env python3
 import argparse
 import asyncio
 import json
 import os
-import re
 import sys
-import threading
+import tempfile
+from collections import deque
 from datetime import datetime
 
-import pyshark
+try:
+    import pyshark
+except ImportError:
+    sys.exit(
+        "Modul 'pyshark' belum terinstall.\n"
+        "Install dengan: pip install pyshark\n"
+        "Pastikan juga tshark (bagian dari Wireshark) sudah terinstall di sistem."
+    )
+
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 
-def ensure_event_loop():
+def bytes_to_ascii(raw_bytes: bytes) -> str:
+    return "".join(
+        chr(b) if 32 <= b <= 126 else "."
+        for b in raw_bytes
+    )
+
+
+def extract_http_detail(packet) -> dict:
+    detail = {}
+    if not hasattr(packet, "http"):
+        return detail
+
+    http = packet.http
+
+    method = _safe(http, "request_method")
+    if method:
+        detail["type"] = "request"
+        detail["method"] = method
+        detail["host"] = _safe(http, "host")
+        detail["uri"] = _safe(http, "request_uri")
+        detail["full_uri"] = _safe(http, "request_full_uri")
+        detail["user_agent"] = _safe(http, "user_agent")
+
+    code = _safe(http, "response_code")
+    if code:
+        detail["type"] = "response"
+        detail["status_code"] = code
+        detail["status_phrase"] = _safe(http, "response_phrase")
+        detail["content_type"] = _safe(http, "content_type")
+        detail["content_length"] = _safe(http, "content_length")
+
+    body_hex = _safe(http, "file_data")
+    if body_hex:
+        try:
+            body_bytes = bytes.fromhex(body_hex.replace(":", ""))
+            detail["body_ascii"] = bytes_to_ascii(body_bytes)
+        except ValueError:
+            pass
+
+    return detail
+
+
+def extract_payload_ascii(packet) -> str:
+    payload_hex = None
+
+    for layer_name in ("data", "tcp", "udp"):
+        if hasattr(packet, layer_name):
+            layer = getattr(packet, layer_name)
+            if hasattr(layer, "data"):
+                payload_hex = layer.data.replace(":", "")
+                break
+            if hasattr(layer, "payload"):
+                payload_hex = layer.payload.replace(":", "")
+                break
+
+    if not payload_hex:
+        return ""
+
     try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    def _silent_exception_handler(loop, context):
-        exc = context.get("exception")
-        if isinstance(exc, EOFError):
-            return
-        loop.default_exception_handler(context)
-
-    loop.set_exception_handler(_silent_exception_handler)
+        raw_bytes = bytes.fromhex(payload_hex)
+        return bytes_to_ascii(raw_bytes)
+    except ValueError:
+        return ""
 
 
-class RealtimeCaptureWriter:
-    def __init__(self, output_path: str, flush_interval: float = 2.0, max_records: int = None):
-        self.output_path = output_path
-        self.flush_interval = flush_interval
+class JSONStore:
+    def __init__(self, json_path: str, max_records: int = 100):
+        self.json_path = json_path
         self.max_records = max_records
-        self.records = []
-        self.lock = threading.Lock()
-        self._stop_event = threading.Event()
-        self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
+        self.records = deque(maxlen=max_records)
 
-    def start(self):
-        self._writer_thread.start()
+    def add(self, record: dict):
+        self.records.append(record)
+        self._flush()
 
-    def stop(self):
-        self._stop_event.set()
-        self._writer_thread.join(timeout=self.flush_interval + 2)
-        self._flush_to_disk()
-
-    def add_packet(self, record: dict):
-        with self.lock:
-            self.records.append(record)
-            if self.max_records and len(self.records) > self.max_records:
-                self.records = self.records[-self.max_records:]
-
-    def _writer_loop(self):
-        while not self._stop_event.is_set():
-            self._flush_to_disk()
-            self._stop_event.wait(self.flush_interval)
-
-    def _flush_to_disk(self):
-        with self.lock:
-            data_snapshot = list(self.records)
-        tmp_path = self.output_path + ".tmp"
+    def _flush(self):
+        directory = os.path.dirname(os.path.abspath(self.json_path)) or "."
+        fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
         try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(data_snapshot, f, indent=2, ensure_ascii=False)
-            os.replace(tmp_path, self.output_path)
-        except Exception as e:
-            print(f"[!] Gagal menulis ke {self.output_path}: {e}", file=sys.stderr)
-
-
-ASCII_STRING_PATTERN = re.compile(rb"[\x20-\x7e]{4,}")
-
-
-def extract_ascii_strings(raw_bytes) -> list:
-    if not raw_bytes:
-        return []
-    return [m.decode("ascii", errors="ignore") for m in ASCII_STRING_PATTERN.findall(raw_bytes)]
-
-
-def layer_to_dict(layer) -> dict:
-    fields = {}
-    for field_name in layer.field_names:
-        try:
-            value = layer.get_field_value(field_name)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(list(self.records), f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, self.json_path)
         except Exception:
-            value = None
-        fields[field_name] = str(value) if value is not None else None
-    return fields
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
 
 
-def packet_to_dict(pkt) -> dict:
+def _safe(layer, field, default=None):
+    return getattr(layer, field, default)
+
+
+def build_packet_record(packet, index: int) -> dict:
     record = {
-        "timestamp": datetime.now().isoformat(),
-        "frame_number": getattr(pkt, "number", None),
-        "sniff_time": pkt.sniff_time.isoformat() if getattr(pkt, "sniff_time", None) else None,
-        "length": pkt.length if hasattr(pkt, "length") else None,
-        "highest_layer": pkt.highest_layer if hasattr(pkt, "highest_layer") else None,
-        "layers": {},
-        "ascii_strings": [],
+        "index": index,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "protocol": None,
+        "length": None,
+        "eth": {"src_mac": None, "dst_mac": None},
+        "ip_version": None,
+        "src_ip": None,
+        "dst_ip": None,
+        "ip_detail": {},
+        "transport": None,
+        "src_port": None,
+        "dst_port": None,
+        "transport_detail": {},
+        "http_detail": {},
+        "payload_ascii": "",
     }
-
-    for layer in pkt.layers:
-        record["layers"][layer.layer_name] = layer_to_dict(layer)
-
     try:
-        raw_bytes = pkt.get_raw_packet()
-        record["ascii_strings"] = extract_ascii_strings(raw_bytes)
-    except Exception:
-        record["ascii_strings"] = []
+        record["protocol"] = packet.highest_layer
+        record["length"] = packet.length
+
+        if hasattr(packet, "eth"):
+            record["eth"]["src_mac"] = _safe(packet.eth, "src")
+            record["eth"]["dst_mac"] = _safe(packet.eth, "dst")
+
+        if hasattr(packet, "ip"):
+            ip = packet.ip
+            record["ip_version"] = "IPv4"
+            record["src_ip"] = _safe(ip, "src")
+            record["dst_ip"] = _safe(ip, "dst")
+            record["ip_detail"] = {
+                "hdr_len": _safe(ip, "hdr_len"),
+                "dsfield": _safe(ip, "dsfield"),
+                "total_len": _safe(ip, "len"),
+                "ttl": _safe(ip, "ttl"),
+                "proto": _safe(ip, "proto"),
+                "flags": _safe(ip, "flags"),
+                "checksum": _safe(ip, "checksum"),
+            }
+        elif hasattr(packet, "ipv6"):
+            ip6 = packet.ipv6
+            record["ip_version"] = "IPv6"
+            record["src_ip"] = _safe(ip6, "src")
+            record["dst_ip"] = _safe(ip6, "dst")
+            record["ip_detail"] = {
+                "traffic_class": _safe(ip6, "tclass"),
+                "flow_label": _safe(ip6, "flow"),
+                "payload_len": _safe(ip6, "plen"),
+                "next_header": _safe(ip6, "nxt"),
+                "hop_limit": _safe(ip6, "hlim"),
+            }
+
+        if hasattr(packet, "tcp"):
+            tcp = packet.tcp
+            record["transport"] = "TCP"
+            record["src_port"] = _safe(tcp, "srcport")
+            record["dst_port"] = _safe(tcp, "dstport")
+            record["transport_detail"] = {
+                "seq": _safe(tcp, "seq"),
+                "ack": _safe(tcp, "ack"),
+                "flags": _safe(tcp, "flags"),
+                "window_size": _safe(tcp, "window_size"),
+                "checksum": _safe(tcp, "checksum"),
+            }
+        elif hasattr(packet, "udp"):
+            udp = packet.udp
+            record["transport"] = "UDP"
+            record["src_port"] = _safe(udp, "srcport")
+            record["dst_port"] = _safe(udp, "dstport")
+            record["transport_detail"] = {
+                "length": _safe(udp, "length"),
+                "checksum": _safe(udp, "checksum"),
+            }
+
+        record["http_detail"] = extract_http_detail(packet)
+        record["payload_ascii"] = extract_payload_ascii(packet)
+    except AttributeError:
+        pass
 
     return record
 
 
+def print_packet_info(record: dict):
+    print(
+        f"\n[{record['index']}] {record['timestamp']} | "
+        f"{str(record['protocol']):<6} | "
+        f"{record['src_ip']}:{record['src_port']} -> "
+        f"{record['dst_ip']}:{record['dst_port']} | len={record['length']}"
+    )
+    if record["eth"]["src_mac"] or record["eth"]["dst_mac"]:
+        print(f"    MAC            : {record['eth']['src_mac']} -> {record['eth']['dst_mac']}")
+    if record["ip_version"]:
+        print(f"    IP versi       : {record['ip_version']}")
+        for k, v in record["ip_detail"].items():
+            print(f"      {k:<14}: {v}")
+    if record["transport"]:
+        print(f"    Transport      : {record['transport']}")
+        for k, v in record["transport_detail"].items():
+            print(f"      {k:<14}: {v}")
+    if record["http_detail"]:
+        print("    HTTP           :")
+        for k, v in record["http_detail"].items():
+            print(f"      {k:<14}: {v}")
+    if record["payload_ascii"]:
+        print(f"    Payload (ASCII): {record['payload_ascii']}")
+    else:
+        print("    Payload (ASCII): <tidak ada / tidak dapat didekode>")
+
+
+def live_capture(interface: str, bpf_filter: str, count: int, output_file: str,
+                  json_path: str, max_records: int):
+    print(f"Memulai live capture di interface '{interface}' ...")
+    if bpf_filter:
+        print(f"Filter BPF: {bpf_filter}")
+    if count:
+        print(f"Batas jumlah paket: {count}")
+    if output_file:
+        print(f"Paket akan disimpan ke: {output_file}")
+    if json_path:
+        print(f"Hasil realtime disimpan ke JSON: {json_path} (menyimpan {max_records} capture terbaru)")
+
+    store = JSONStore(json_path, max_records) if json_path else None
+
+    capture = pyshark.LiveCapture(
+        interface=interface,
+        bpf_filter=bpf_filter if bpf_filter else None,
+        output_file=output_file if output_file else None,
+    )
+
+    idx = 0
+    try:
+        for packet in capture.sniff_continuously(packet_count=count if count else None):
+            idx += 1
+            record = build_packet_record(packet, idx)
+            print_packet_info(record)
+            if store:
+                store.add(record)
+    except KeyboardInterrupt:
+        print("\nCapture dihentikan oleh user (Ctrl+C).")
+    finally:
+        capture.close()
+        print(f"\nTotal paket ditangkap: {idx}")
+
+
+def read_from_file(pcap_path: str, bpf_filter: str, json_path: str, max_records: int):
+    print(f"Membaca paket dari file: {pcap_path}")
+    if json_path:
+        print(f"Hasil realtime disimpan ke JSON: {json_path} (menyimpan {max_records} capture terbaru)")
+
+    store = JSONStore(json_path, max_records) if json_path else None
+
+    capture = pyshark.FileCapture(pcap_path, display_filter=bpf_filter if bpf_filter else None)
+
+    idx = 0
+    for packet in capture:
+        idx += 1
+        record = build_packet_record(packet, idx)
+        print_packet_info(record)
+        if store:
+            store.add(record)
+    capture.close()
+    print(f"\nTotal paket dibaca: {idx}")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Real-time network capture ke JSON menggunakan pyshark.")
-    parser.add_argument("-i", "--interface", required=True)
-    parser.add_argument("-o", "--output", default="capture_output.json")
-    parser.add_argument("-f", "--filter", default=None)
-    parser.add_argument("--flush-interval", type=float, default=2.0)
-    parser.add_argument("--max-records", type=int, default=100)
+    parser = argparse.ArgumentParser(
+        description="Tangkap traffic jaringan (mirip Wireshark) dengan PyShark, termasuk payload ASCII."
+    )
+    parser.add_argument("-i", "--interface", help="Nama interface untuk live capture, contoh: eth0, wlan0")
+    parser.add_argument("-r", "--read-file", help="Baca paket dari file .pcap/.pcapng yang sudah ada")
+    parser.add_argument("-f", "--filter", default="", help="Filter BPF (live capture) atau display filter (read file)")
+    parser.add_argument("-c", "--count", type=int, default=0, help="Jumlah maksimum paket yang ditangkap (0 = tanpa batas)")
+    parser.add_argument("-o", "--output", default="", help="Simpan hasil live capture ke file .pcap")
+    parser.add_argument("-j", "--json-output", default="", help="Simpan hasil capture ke file JSON secara realtime")
+    parser.add_argument("--max-records", type=int, default=100,
+                         help="Jumlah capture terbaru yang disimpan di file JSON (default: 100)")
+
     args = parser.parse_args()
 
-    ensure_event_loop()
-
-    writer = RealtimeCaptureWriter(
-        output_path=args.output,
-        flush_interval=args.flush_interval,
-        max_records=args.max_records,
-    )
-    writer.start()
-
-    capture_kwargs = {"interface": args.interface, "include_raw": True, "use_json": True}
-    if args.filter:
-        capture_kwargs["bpf_filter"] = args.filter
-
-    capture = pyshark.LiveCapture(**capture_kwargs)
-
-    print(f"[*] Memulai capture di interface '{args.interface}' ...")
-    print(f"[*] Hasil akan diupdate real-time ke: {args.output}")
-    print("[*] Tekan CTRL+C untuk berhenti.\n")
-
-    exit_code = 0
-
-    try:
-        for pkt in capture.sniff_continuously():
-            try:
-                record = packet_to_dict(pkt)
-                writer.add_packet(record)
-                ip_layer = record["layers"].get("ip") or record["layers"].get("ipv6") or {}
-                src = ip_layer.get("ip.src") or ip_layer.get("ipv6.src")
-                dst = ip_layer.get("ip.dst") or ip_layer.get("ipv6.dst")
-                print(f"[+] #{record['frame_number']} {src} -> {dst} "
-                      f"[{record['highest_layer']}] len={record['length']}")
-            except Exception as e:
-                print(f"[!] Error memproses paket: {e}", file=sys.stderr)
-    except KeyboardInterrupt:
-        print("\n[*] Menghentikan capture, menyimpan sisa data...")
-    except Exception as e:
-        print(f"[!] Capture error: {e}", file=sys.stderr)
-        exit_code = 1
-    finally:
-        try:
-            capture.close()
-        except Exception:
-            pass
-        writer.stop()
-        print("[*] Selesai. File JSON final tersimpan di:", args.output)
-
-    sys.exit(exit_code)
+    if args.read_file:
+        read_from_file(args.read_file, args.filter, args.json_output, args.max_records)
+    elif args.interface:
+        live_capture(args.interface, args.filter, args.count, args.output,
+                     args.json_output, args.max_records)
+    else:
+        parser.print_help()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

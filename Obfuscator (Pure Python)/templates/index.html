@@ -110,6 +110,47 @@
       </div>
       <div id="st-out" class="results empty">Hasil steganografi akan muncul di sini.</div>
     </section>
+
+    <section class="card" id="jwt-card">
+      <div class="card-head"><h2>JWT</h2><span>decode, verifikasi &amp; buat token (HS256/384/512)</span></div>
+      <div class="seg" id="jwt-mode">
+        <button type="button" class="seg-btn active" data-val="decode">Decode &amp; Verifikasi</button>
+        <button type="button" class="seg-btn" data-val="encode">Buat token</button>
+      </div>
+
+      <div id="jwt-decode-pane">
+        <label class="small" for="jwt-token" style="margin-top:.95rem">Token JWT (Encoded)</label>
+        <textarea id="jwt-token" class="jwt-mono" placeholder="Tempel token: eyJhbGciOiJIUzI1Ni...  (header.payload.signature)"></textarea>
+        <label class="small" for="jwt-secret" style="margin-top:.85rem">Secret (opsional — untuk verifikasi HMAC)</label>
+        <input type="text" id="jwt-secret" class="jwt-input" placeholder="mis. your-256-bit-secret" autocomplete="off">
+        <div class="row">
+          <button class="btn" id="jwt-dec-run" onclick="jwtDecode()">Decode &amp; Verifikasi</button>
+          <button class="btn ghost" onclick="clearJwt()">Bersihkan</button>
+        </div>
+      </div>
+
+      <div id="jwt-encode-pane" hidden>
+        <label class="small" style="margin-top:.95rem">Algoritma</label>
+        <div class="seg" id="jwt-alg">
+          <button type="button" class="seg-btn active" data-val="HS256">HS256</button>
+          <button type="button" class="seg-btn" data-val="HS384">HS384</button>
+          <button type="button" class="seg-btn" data-val="HS512">HS512</button>
+        </div>
+        <label class="small" for="jwt-payload" style="margin-top:.95rem">Payload (JSON)</label>
+        <textarea id="jwt-payload" class="jwt-mono" placeholder='{"sub":"1234567890","name":"John Doe","iat":1516239022}'></textarea>
+        <label class="small" for="jwt-enc-secret" style="margin-top:.85rem">Secret</label>
+        <input type="text" id="jwt-enc-secret" class="jwt-input" placeholder="mis. your-256-bit-secret" autocomplete="off">
+        <div class="row">
+          <button class="btn" id="jwt-enc-run" onclick="jwtEncode()">Buat &amp; tanda tangani</button>
+          <button class="btn ghost" onclick="clearJwt()">Bersihkan</button>
+        </div>
+      </div>
+
+      <div class="result-head">
+        <span class="meta" id="jwt-meta">Hasil</span>
+      </div>
+      <div id="jwt-out" class="results empty">Hasil JWT akan muncul di sini.</div>
+    </section>
     </div>
 
     <footer>Berjalan di <code>127.0.0.1:8000</code> · logika di <code>modules/</code></footer>

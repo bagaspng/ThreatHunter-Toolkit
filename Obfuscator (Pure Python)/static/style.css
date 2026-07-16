@@ -194,8 +194,49 @@ footer code { color: var(--muted); }
   Menlo, monospace; font-size: .85rem; word-break: break-all; white-space: pre-wrap;
   margin-bottom: .7rem; }
 
+/* JWT */
+#jwt-card { grid-column: 1 / -1; }
+.jwt-mono { min-height: 84px; }
+.jwt-input { width: 100%; color: var(--text); background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 11px; padding: .7rem .9rem;
+  font-size: .88rem; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  transition: border-color .15s, box-shadow .15s; }
+.jwt-input:focus { outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.25); }
+.jwt-input::placeholder { color: #56657f; }
+.jwt-token { background: #070c17; border: 1px solid var(--border); border-radius: 11px;
+  padding: .8rem .9rem; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: .84rem; line-height: 1.6; word-break: break-all; }
+.jwt-token .jwt-h { color: #fb015b; }
+.jwt-token .jwt-p { color: #d63aff; }
+.jwt-token .jwt-s { color: #00b9f1; }
+.jwt-token .jwt-dot { color: var(--muted); }
+.jwt-verify { border-radius: 10px; padding: .6rem .85rem; font-size: .82rem;
+  font-weight: 600; line-height: 1.45; }
+.jwt-verify.ok { color: #34d399; border: 1px solid rgba(52,211,153,.4);
+  background: rgba(52,211,153,.1); }
+.jwt-verify.bad { color: #fca5a5; border: 1px solid #7f1d1d;
+  background: rgba(153,27,27,.18); }
+.jwt-verify.none { color: var(--muted); border: 1px dashed var(--border);
+  background: #070c17; font-weight: 500; }
+.jwt-block { display: flex; flex-direction: column; gap: .4rem; }
+.jwt-block-title { font-size: .7rem; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--accent-2); }
+.jwt-block-title.jwt-h { color: #fb015b; }
+.jwt-block-title.jwt-p { color: #d63aff; }
+.jwt-json { margin: 0; background: #070c17; border: 1px solid var(--border);
+  border-radius: 11px; padding: .8rem .9rem; max-height: 240px; overflow: auto;
+  color: #cbd5e1; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: .82rem; line-height: 1.55; white-space: pre-wrap; word-break: break-all; }
+.jwt-claim { display: flex; gap: .7rem; flex-wrap: wrap; background: #070c17;
+  border: 1px solid var(--border); border-radius: 10px; padding: .45rem .7rem; }
+.jwt-claim-key { flex: 0 0 160px; font-size: .76rem; font-weight: 600; color: var(--muted); }
+.jwt-claim-val { flex: 1; min-width: 0; font-size: .8rem; color: #cbd5e1;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; word-break: break-all; }
+
 @media (max-width: 560px) {
   .wrap { padding: 2rem 1rem 3rem; }
+  .jwt-claim-key { flex: 0 0 auto; }
   h1 { font-size: 1.55rem; }
   .card { padding: 1.1rem 1.05rem 1.2rem; }
   .mrow { flex-wrap: wrap; }

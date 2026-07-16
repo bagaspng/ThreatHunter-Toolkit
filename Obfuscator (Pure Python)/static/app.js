@@ -536,6 +536,187 @@ function downloadStego() {
   toast("Gambar diunduh");
 }
 
+const jwtToken = document.getElementById("jwt-token");
+const jwtSecret = document.getElementById("jwt-secret");
+let lastJwt = null;
+
+document.querySelectorAll("#jwt-mode .seg-btn").forEach(function (b) {
+  b.addEventListener("click", function () { setJwtMode(b.dataset.val); });
+});
+function setJwtMode(val) {
+  document.querySelectorAll("#jwt-mode .seg-btn").forEach(function (x) {
+    x.classList.toggle("active", x.dataset.val === val);
+  });
+  document.getElementById("jwt-decode-pane").hidden = val !== "decode";
+  document.getElementById("jwt-encode-pane").hidden = val !== "encode";
+  clearJwt();
+}
+document.querySelectorAll("#jwt-alg .seg-btn").forEach(function (b) {
+  b.addEventListener("click", function () {
+    document.querySelectorAll("#jwt-alg .seg-btn").forEach(function (x) {
+      x.classList.toggle("active", x === b);
+    });
+  });
+});
+function jwtAlg() {
+  return document.querySelector("#jwt-alg .seg-btn.active").dataset.val;
+}
+
+function clearJwt() {
+  jwtToken.value = "";
+  jwtSecret.value = "";
+  document.getElementById("jwt-payload").value = "";
+  document.getElementById("jwt-enc-secret").value = "";
+  document.getElementById("jwt-meta").textContent = "Hasil";
+  const out = document.getElementById("jwt-out");
+  out.classList.add("empty");
+  out.textContent = "Hasil JWT akan muncul di sini.";
+  lastJwt = null;
+}
+
+function jwtColorToken(token) {
+  const parts = token.split(".");
+  const box = document.createElement("div");
+  box.className = "jwt-token";
+  const cls = ["jwt-h", "jwt-p", "jwt-s"];
+  parts.forEach(function (seg, i) {
+    if (i) {
+      const dot = document.createElement("span");
+      dot.className = "jwt-dot";
+      dot.textContent = ".";
+      box.appendChild(dot);
+    }
+    const span = document.createElement("span");
+    span.className = cls[i] || "jwt-s";
+    span.textContent = seg;
+    box.appendChild(span);
+  });
+  return box;
+}
+
+function jwtJsonBlock(title, obj, kind) {
+  const wrap = document.createElement("div");
+  wrap.className = "jwt-block";
+  const h = document.createElement("div");
+  h.className = "jwt-block-title " + kind;
+  h.textContent = title;
+  const pre = document.createElement("pre");
+  pre.className = "jwt-json";
+  pre.textContent = JSON.stringify(obj, null, 2);
+  wrap.appendChild(h);
+  wrap.appendChild(pre);
+  return wrap;
+}
+
+function jwtClaimsBlock(claims) {
+  const wrap = document.createElement("div");
+  wrap.className = "jwt-block";
+  const h = document.createElement("div");
+  h.className = "jwt-block-title";
+  h.textContent = "Klaim standar";
+  wrap.appendChild(h);
+  claims.forEach(function (c) {
+    const row = document.createElement("div");
+    row.className = "jwt-claim";
+    const k = document.createElement("span");
+    k.className = "jwt-claim-key";
+    k.textContent = c.label + " (" + c.key + ")";
+    const v = document.createElement("span");
+    v.className = "jwt-claim-val";
+    v.textContent = c.note ? c.value + " · " + c.note : String(c.value);
+    row.appendChild(k);
+    row.appendChild(v);
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
+function jwtVerifyBadge(verify) {
+  const badge = document.createElement("div");
+  if (verify === null || verify === undefined) {
+    badge.className = "jwt-verify none";
+    badge.textContent = "Signature belum diverifikasi (isi secret untuk mengecek).";
+    return badge;
+  }
+  badge.className = "jwt-verify " + (verify.verified ? "ok" : "bad");
+  badge.textContent = (verify.verified ? "✓ Signature Verified — " : "✗ Invalid Signature — ")
+    + verify.reason;
+  return badge;
+}
+
+async function jwtDecode() {
+  const token = jwtToken.value.trim();
+  if (!token) { showError("jwt-out", "Token masih kosong."); return; }
+  loading("jwt-dec-run", true);
+  setOut("jwt-out", "Membaca token...", true);
+  try {
+    const res = await fetch("/api/jwt/decode", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: token, secret: jwtSecret.value })
+    });
+    const data = await res.json();
+    if (data.error) { showError("jwt-out", data.error); return; }
+    const out = document.getElementById("jwt-out");
+    out.classList.remove("empty");
+    out.textContent = "";
+    out.appendChild(jwtColorToken(token));
+    out.appendChild(jwtVerifyBadge(data.verify));
+    out.appendChild(jwtJsonBlock("Header", data.header, "jwt-h"));
+    out.appendChild(jwtJsonBlock("Payload", data.payload, "jwt-p"));
+    if (data.claims && data.claims.length) out.appendChild(jwtClaimsBlock(data.claims));
+    document.getElementById("jwt-meta").textContent =
+      "alg " + (data.algorithm || "?");
+  } catch (e) {
+    showError("jwt-out", "Gagal terhubung ke server.");
+  } finally {
+    loading("jwt-dec-run", false);
+  }
+}
+
+async function jwtEncode() {
+  const payload = document.getElementById("jwt-payload").value.trim();
+  const secret = document.getElementById("jwt-enc-secret").value;
+  if (!payload) { showError("jwt-out", "Payload JSON masih kosong."); return; }
+  if (!secret) { showError("jwt-out", "Secret masih kosong."); return; }
+  loading("jwt-enc-run", true);
+  setOut("jwt-out", "Menandatangani token...", true);
+  try {
+    const res = await fetch("/api/jwt/encode", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload: payload, secret: secret, algorithm: jwtAlg() })
+    });
+    const data = await res.json();
+    if (data.error) { showError("jwt-out", data.error); return; }
+    const out = document.getElementById("jwt-out");
+    out.classList.remove("empty");
+    out.textContent = "";
+    out.appendChild(jwtColorToken(data.token));
+    const actions = document.createElement("div");
+    actions.className = "row";
+    const copy = document.createElement("button");
+    copy.className = "mcopy";
+    copy.textContent = "Salin token";
+    copy.addEventListener("click", function () { copyText(data.token, copy); });
+    const send = document.createElement("button");
+    send.className = "msend";
+    send.textContent = "→ Decode";
+    send.addEventListener("click", function () {
+      setJwtMode("decode");
+      jwtToken.value = data.token;
+      jwtSecret.value = secret;
+      jwtDecode();
+    });
+    actions.appendChild(copy);
+    actions.appendChild(send);
+    out.appendChild(actions);
+    document.getElementById("jwt-meta").textContent = "alg " + data.algorithm;
+  } catch (e) {
+    showError("jwt-out", "Gagal terhubung ke server.");
+  } finally {
+    loading("jwt-enc-run", false);
+  }
+}
+
 updateCounter("ed-input", "ed-count");
 updateCounter("ob-input", "ob-count");
 updateCounter("st-msg", "st-msg-count");

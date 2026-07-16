@@ -6,6 +6,8 @@
 |------|--------|-------|
 | `main.py` | Menu interaktif terminal | manusia |
 | `obfuscate.py` | CLI (stdin/stdout) | automasi/pipeline |
+| `stego_umum.py` | CLI ekstraktor pesan LSB pada PNG | analisis gambar |
+| `jwt_umum.py` | CLI JWT (decode/verify/encode) | analisis/pembuatan token |
 | **`app.py`** | **Web API + halaman form** | akses lewat HTTP/browser |
 
 Semua logika tetap memakai modul di `modules/` — API hanya membungkusnya.
@@ -42,6 +44,12 @@ Berkas halaman web dipisah dari `app.py`:
   jumlah berhasil/gagal); ada toggle **"Tampilkan yang gagal"**.
 - **Obfuscate** dengan **unggah file** atau **seret & lepas (drag & drop)** file
   (tipe auto dari ekstensi) dan **unduh hasil**.
+- **Steganografi** — sisipkan/ekstrak pesan pada bit LSB gambar PNG, dengan
+  pratinjau sebelum/sesudah.
+- **JWT** (bergaya *jwt.io*) — tempel token untuk melihat **header**, **payload**,
+  dan **klaim standar** (exp/iat/nbf ditafsirkan jadi tanggal + status berlaku),
+  **verifikasi signature** dengan secret, serta mode **buat token** baru.
+  Bagian token diwarnai (header merah · payload ungu · signature biru).
 - **Counter** karakter/byte, tombol **Bersihkan**, dan pintasan **Ctrl/Cmd+Enter**.
 - Indikator **loading**, notifikasi **toast**, pesan **error** berstyle, dan
   tampilan **responsif** (mobile).
@@ -114,6 +122,38 @@ url/unicode/ascii) sampai hasilnya bukan encoding lagi.
   ```
 - Kalau tak ada lapisan yang terdeteksi, `steps` kosong dan `final` = input.
 
+### `POST /api/jwt/decode`
+Membaca token JWT (**tanpa** butuh secret) dan, bila secret diberikan, sekaligus
+memverifikasi signature. Verifikasi hanya untuk HMAC (**HS256/HS384/HS512**);
+algoritma RS/ES tetap bisa di-*decode* tetapi tidak diverifikasi.
+
+- **Input** (JSON): `{"token": "eyJ...", "secret": "your-256-bit-secret"}`
+  (field `secret` opsional)
+- **Output**:
+  ```json
+  {
+    "header": { "alg": "HS256", "typ": "JWT" },
+    "payload": { "sub": "1234567890", "name": "John Doe", "iat": 1516239022 },
+    "signature": "SflKxwRJSMe...",
+    "algorithm": "HS256",
+    "claims": [
+      { "key": "iat", "label": "Issued At", "value": 1516239022,
+        "note": "2018-01-18 01:30:22 UTC" }
+    ],
+    "verify": { "verified": true, "algorithm": "HS256",
+                "reason": "Signature cocok dengan secret." }
+  }
+  ```
+- `verify` bernilai `null` bila secret tidak diberikan. Klaim waktu (`exp`, `nbf`,
+  `iat`) ditafsirkan jadi tanggal UTC; `exp`/`nbf` juga menandai status berlaku.
+
+### `POST /api/jwt/encode`
+Membuat & menandatangani token baru (HMAC).
+
+- **Input** (JSON): `{"payload": {"sub":"123"}, "secret": "kunci", "algorithm": "HS256"}`
+  (`algorithm` opsional, default `HS256`; `header` opsional untuk field tambahan)
+- **Output**: `{"token": "eyJ...", "algorithm": "HS256"}`
+
 ### `POST /api/obfuscate`
 Meng-obfuscate kode. Mendukung tipe **js, css, py, html**.
 
@@ -150,6 +190,16 @@ curl -X POST http://127.0.0.1:8000/api/decode \
 # Kupas encoding berlapis sampai habis
 curl -X POST http://127.0.0.1:8000/api/peel \
   -H 'Content-Type: application/json' -d '{"text":"WkZjMWNHSkhSbkZaV0d4bw=="}'
+
+# JWT — decode + verifikasi signature
+curl -X POST http://127.0.0.1:8000/api/jwt/decode \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c","secret":"your-256-bit-secret"}'
+
+# JWT — buat token baru
+curl -X POST http://127.0.0.1:8000/api/jwt/encode \
+  -H 'Content-Type: application/json' \
+  -d '{"payload":{"sub":"123","name":"Ana"},"secret":"kunci","algorithm":"HS256"}'
 
 # Obfuscate via JSON
 curl -X POST http://127.0.0.1:8000/api/obfuscate \
