@@ -1,14 +1,30 @@
-# File Hidder — Script Sembunyikan & Ekstrak File
+# File Hider — SFX Builder
 
-Script Python sederhana untuk menyembunyikan satu atau beberapa file di dalam file lain (foto, video, dokumen, dll), dengan opsi proteksi password.
+Script Python untuk membangun **Self-Extracting Executable (SFX)** — file `.exe` yang saat diklik otomatis mengekstrak semua payload tersembunyi ke folder temp, lalu menjalankan semuanya secara bersamaan. Payload terenkripsi dengan **Fernet** dan disematkan langsung di dalam body executable, persis seperti cara kerja RAR SFX.
+
+---
 
 ## Cara Kerja
 
-1. File-file rahasia dikemas jadi satu paket (nama, ukuran, dan isi masing-masing file).
-2. Paket tersebut dienkripsi dengan **Fernet** (AES + HMAC). Kunci enkripsi diturunkan dari password lewat **PBKDF2-HMAC-SHA256** (480.000 iterasi + salt acak) — atau kunci tetap bawaan jika tidak memakai password.
-3. Hasil enkripsi ditempel di **belakang** file cover, diawali marker unik + flag penanda password + salt + panjang data.
-4. Karena kebanyakan format file (JPG, PDF, MP4, dll) mengabaikan data tambahan setelah penanda akhir mereka sendiri, file cover tetap bisa dibuka/diputar seperti biasa meski sudah ditambahkan data rahasia.
-5. Saat ekstraksi, script mencari marker dari belakang file, membaca flag untuk tahu apakah perlu meminta password, lalu mendekripsi dan mengembalikan file-file asli ke folder tujuan.
+1. Semua file payload dikemas jadi satu blob dengan metadata nama dan ukuran masing-masing file.
+2. Blob tersebut dienkripsi dengan **Fernet** (AES-128-CBC + HMAC-SHA256), menggunakan kunci acak yang di-generate tiap build.
+3. Stub Python dikompilasi jadi `.exe` mandiri menggunakan **PyInstaller** — stub ini bertugas membaca dirinya sendiri saat dijalankan, menemukan payload, mendekripsi, dan mengeksekusi.
+4. Kunci Fernet dan payload terenkripsi ditempel di **ekor** stub exe, diawali marker unik sebagai penanda posisi.
+5. Jika flag `--icon` diberikan, gambar PNG/JPG dikonversi dulu ke `.ico` sebelum dikompilasi — hasilnya ikon exe terlihat seperti foto di Windows Explorer.
+6. Saat exe diklik, stub membaca byte dirinya sendiri, mencari marker dari belakang, mendekripsi payload, mengekstrak semua file ke `%TEMP%`, lalu menjalankan semuanya **bersamaan** via `subprocess.Popen()`.
+
+### Struktur Byte File Output
+
+```
+output.exe
+├── [PyInstaller stub binary]     ← Logic Python terkompilasi
+├── "FVEILKEY" + [Fernet Key]     ← Marker + kunci enkripsi (44 byte)
+├── "FVEIL01\x00"                 ← Marker payload
+├── [token_len] (4 byte)          ← Panjang ciphertext
+└── [Encrypted Token]             ← Semua payload terenkripsi di dalam
+```
+
+---
 
 ## Instalasi
 
@@ -16,74 +32,75 @@ Script Python sederhana untuk menyembunyikan satu atau beberapa file di dalam fi
 pip install -r requirements.txt
 ```
 
-Hanya butuh satu library eksternal: `cryptography`. Sisanya bawaan Python 3.7+.
+---
 
 ## Cara Pakai
 
-### Menyembunyikan file (`hide`)
-
-**Tanpa password:**
+**Build SFX dengan satu payload:**
 ```bash
-python script.py hide -c foto.jpg -s dokumen.pdf -o hasil.jpg
+python script.py -p payload.bat -o output.exe
 ```
 
-**Dengan password (tambahkan flag `-p`):**
+**Build SFX dengan beberapa payload (semua jalan bersamaan saat diklik):**
 ```bash
-python script.py hide -c foto.jpg -s dokumen.pdf -o hasil.jpg -p
-```
-Script akan meminta password dua kali (input tidak ditampilkan di layar).
-
-**Menyembunyikan beberapa file sekaligus:**
-```bash
-python script.py hide -c video.mp4 -s rahasia1.txt rahasia2.docx rahasia3.pdf -o video_tersembunyi.mp4 -p
+python script.py -p file1.bat file2.exe file3.py -o output.exe
 ```
 
-> **Penting:** ekstensi file `-o` (output) harus sama dengan ekstensi file `-c` (cover). Kalau berbeda, script akan menolak dan menampilkan error.
-
-### Mengekstrak file (`extract`)
-
+**Build SFX dengan ikon custom dari gambar PNG/JPG:**
 ```bash
-python script.py extract -i hasil.jpg -o folder_output
+python script.py -p payload.bat -o output.exe --icon cover.jpg
 ```
 
-Script **otomatis mendeteksi** apakah file tersebut memakai password atau tidak:
-- Jika **tidak** memakai password → langsung diekstrak tanpa perlu input apa pun.
-- Jika **memakai** password → otomatis muncul prompt untuk memasukkan password yang sama seperti saat `hide`.
+> Ikon dikonversi otomatis dari PNG/JPG ke `.ico` sebelum dikompilasi. File output tetap `.exe` — hanya tampilannya di Windows Explorer yang terlihat seperti foto.
 
-Tidak perlu flag tambahan apa pun saat extract — cukup `-i` dan `-o`.
+---
 
 ## Argumen
 
-| Mode | Flag | Wajib | Keterangan |
-|------|------|-------|------------|
-| `hide` | `-c`, `--cover` | Ya | File cover (mis. `foto.jpg`) |
-| `hide` | `-s`, `--secret` | Ya | Satu atau lebih file yang ingin disembunyikan |
-| `hide` | `-o`, `--output` | Ya | Nama file hasil (ekstensi harus sama dengan cover) |
-| `hide` | `-p`, `--password` | Tidak | Aktifkan proteksi password |
-| `extract` | `-i`, `--input` | Ya | File yang berisi data tersembunyi |
-| `extract` | `-o`, `--output` | Ya | Folder tujuan hasil ekstraksi |
+| Flag | Wajib | Keterangan |
+|------|-------|------------|
+| `-p`, `--payload` | Ya | Satu atau lebih file payload (semua dieksekusi bersamaan saat diklik) |
+| `-o`, `--output` | Ya | Nama file output `.exe` |
+| `--icon` | Tidak | Gambar PNG/JPG untuk ikon exe |
+
+---
+
+## Format Payload yang Didukung
+
+| Ekstensi | Cara Dieksekusi |
+|----------|----------------|
+| `.bat`, `.cmd` | `cmd.exe /c` |
+| `.exe` | Langsung |
+| `.py` | Python interpreter |
+| `.ps1` | PowerShell |
+| `.vbs` | WScript |
+| Lainnya | Asosiasi default Windows (`start`) |
+
+---
 
 ## Contoh Workflow Lengkap
 
 ```bash
-# Siapkan file
-echo "data rahasia" > secret.txt
+# Buat payload test
+echo "start calc.exe" > kalkulator.bat
+echo "start notepad.exe" > notepad.bat
 
-# Sembunyikan dengan password
-python script.py hide -c foto.jpg -s secret.txt -o foto_rahasia.jpg -p
+# Build SFX dengan ikon foto
+python script.py -p kalkulator.bat notepad.bat -o demo.exe --icon cover.jpg
 
-# Ekstrak kembali (password akan diminta otomatis)
-python script.py extract -i foto_rahasia.jpg -o hasil_extract
-
-# Cek isinya
-cat hasil_extract/secret.txt
+# Klik demo.exe → kalkulator dan notepad terbuka bersamaan
 ```
 
-## Batasan & Catatan Keamanan
+---
 
-- Teknik yang dipakai adalah **menempelkan data terenkripsi di akhir file**, bukan steganografi tingkat lanjut (seperti menyisipkan bit di piksel gambar/LSB). File hasil tetap bisa dibuka normal, tapi ukurannya jadi sedikit lebih besar dari cover aslinya — dan siapa pun yang memeriksa file dengan tool forensik atau membandingkan ukuran file bisa mendeteksi ada data tambahan.
-- Mode **tanpa password** memakai kunci enkripsi tetap yang tertanam di script ini (`NO_PASSWORD_DEFAULT`). Artinya siapa pun yang punya salinan script ini bisa membongkar file yang disembunyikan tanpa password — mode ini lebih untuk *menyembunyikan dari orang awam*, bukan mengamankan dari orang yang paham cara kerja script.
-- Jika lupa password yang dipakai saat `hide`, **tidak ada cara memulihkan** file yang disembunyikan — password tidak disimpan di mana pun.
+## Batasan & Catatan
+
+- Windows Defender atau antivirus lain mungkin memberi peringatan saat exe dijalankan — ini normal untuk executable buatan sendiri dengan pola SFX.
+- Payload diekstrak ke folder sementara di `%TEMP%` dan **tidak dihapus otomatis** setelah selesai.
+- Kunci Fernet di-generate baru tiap build — setiap exe yang dihasilkan punya enkripsi yang berbeda.
+- File output selalu berekstensi `.exe` meskipun nama output yang diberikan tidak menyertakannya — script menambahkan ekstensi secara otomatis.
+
+---
 
 ## Requirements
 
