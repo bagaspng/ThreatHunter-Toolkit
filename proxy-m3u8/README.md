@@ -1,4 +1,4 @@
-# Proxy Film Diagnostic App (Flask Backend)
+# Proxy Film Diagnostic App 
 
 Aplikasi Proxy Film Diagnostic adalah platform streaming proxy lokal berbasis **Flask** yang dirancang untuk mengatasi pemblokiran WAF (Web Application Firewall) pada server video streaming (seperti Juicy Codes, Juicy Nginx, Cloudflare, dll.). 
 
