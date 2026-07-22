@@ -1,0 +1,7 @@
+{
+  "clean.js": false,
+  "packer.js": true,
+  "webshell.php": true,
+  "encoded.txt": true,
+  "jsfuck.js": true
+}
