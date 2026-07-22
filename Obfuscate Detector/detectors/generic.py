@@ -51,9 +51,10 @@ def detect_generic(text):
             name="high_entropy", category="generic",
             confidence=min(85, 50 + int((ent - 4.5) * 40)),
             evidence="entropy Shannon %.2f bit/char (tinggi)" % ent,
-            clue="Entropi tinggi menandakan data terpaket/terenkripsi. "
-                 "Cari fungsi decode (atob/unescape/base64) di sekitar blob "
-                 "ini sebagai titik masuk."))
+            clue="Isi teks ini sangat 'acak' — ciri khas data yang dipadatkan "
+                 "atau dikunci. Biasanya ada perintah pembuka di dekatnya; "
+                 "cari kata seperti decode, atob, atau base64 di sekitarnya "
+                 "sebagai titik awal untuk membukanya."))
     elif len(text) > _WINDOW:
         went, woff = max_window_entropy(text)
         if went > 5.0:
@@ -62,9 +63,11 @@ def detect_generic(text):
                 confidence=min(85, 55 + int((went - 5.0) * 30)),
                 evidence="blob entropy tinggi %.2f di sekitar offset %d "
                          "(file keseluruhan %.2f, rendah)" % (went, woff, ent),
-                clue="Ada blok pekat/terenkripsi tersembunyi dalam file yang "
-                     "secara keseluruhan tampak normal. Periksa sekitar offset "
-                     "itu; kemungkinan payload base64/terkompres disisipkan."))
+                clue="Ada satu potongan yang jauh lebih 'acak' daripada sisa "
+                     "berkas — kemungkinan ada data tersembunyi yang "
+                     "disisipkan. Periksa bagian di sekitar posisi tersebut; "
+                     "biasanya berupa teks tersandi atau berkas yang "
+                     "dipadatkan."))
 
     hexnames = len(_RE_HEXNAME.findall(text))
     confuse = len(_RE_CONFUSE.findall(text))
@@ -74,8 +77,9 @@ def detect_generic(text):
             confidence=min(90, 55 + hexnames * 3 + confuse * 3),
             evidence="%d nama gaya _0x, %d nama menyerupai l/I/1/O/0" %
                      (hexnames, confuse),
-            clue="Nama identifier di-mangle. Pakai beautifier + rename "
-                 "(js-beautify, atau Wakaru/de4js untuk JS) agar terbaca."))
+            clue="Nama-nama variabel di kode ini sengaja diacak agar sulit "
+                 "dibaca. Gunakan alat penata/perapi kode (beautifier) untuk "
+                 "merapikannya, lalu ganti nama-nama itu agar bermakna."))
 
     uscore = len(_RE_USCORE.findall(text))
     if uscore >= 5:
@@ -84,10 +88,11 @@ def detect_generic(text):
             confidence=min(90, 55 + uscore * 3),
             evidence="%d identifier underscore-only (_, __, ___ ...) — "
                      "gaya lambda/pyfuscate" % uscore,
-            clue="Nama diganti deretan underscore + dispatch dinamis "
-                 "(__import__/getattr/globals). Beautify lalu rename; telusuri "
-                 "__import__/getattr untuk temukan API asli. JANGAN exec — "
-                 "cetak argumen exec/__import__ untuk lihat sumber."))
+            clue="Kode ini menyamarkan nama dengan deretan garis-bawah "
+                 "(_, __, ___) dan memanggil fungsi secara tersembunyi. "
+                 "Rapikan dengan penata kode, dan telusuri bagian __import__ "
+                 "atau getattr untuk tahu fungsi aslinya. Jangan dijalankan; "
+                 "cukup tampilkan isinya untuk diperiksa."))
 
     ratio = _printable_ratio(text)
     if len(text) >= 32 and ratio < 0.85:
@@ -95,7 +100,8 @@ def detect_generic(text):
             name="low_printable", category="generic",
             confidence=min(80, 50 + int((0.85 - ratio) * 60)),
             evidence="rasio karakter printable %.0f%% (rendah)" % (ratio * 100),
-            clue="Banyak byte non-printable. Kemungkinan biner mentah/terkompres. "
-                 "Buka dengan hex viewer atau CyberChef untuk kenali magic bytes."))
+            clue="Banyak karakter yang tidak bisa ditampilkan — kemungkinan "
+                 "ini data biner atau berkas yang dipadatkan, bukan teks "
+                 "biasa. Buka dengan penampil hex untuk mengenali jenisnya."))
 
     return out

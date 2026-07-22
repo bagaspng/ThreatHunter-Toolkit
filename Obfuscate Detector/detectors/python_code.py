@@ -59,21 +59,24 @@ def detect_python(text):
                     and once("python_marshal_exec"):
                 _add(out, "python_marshal_exec", 90,
                      "exec/eval atas marshal.loads(...)",
-                     "Bytecode di-marshal lalu dijalankan. JANGAN jalankan. "
-                     "Ganti exec dgn print(marshal.loads(...)) di sandbox untuk "
-                     "inspeksi, atau uncompyle6/decompyle3 pada objek code.")
+                     "Kode ini menjalankan perintah tersembunyi dalam bentuk "
+                     "'bytecode' Python. Jangan dijalankan. Untuk memeriksanya, "
+                     "tampilkan isinya (bukan menjalankannya) di lingkungan "
+                     "terpisah/sandbox.")
             if "compile" in arg and once("python_eval_compile"):
                 _add(out, "python_eval_compile", 80,
                      "exec/eval atas compile(...)",
-                     "Kode dikompilasi saat runtime. Cetak argumen sumber "
-                     "compile() alih-alih menjalankannya.")
+                     "Kode ini menyusun lalu menjalankan perintah saat "
+                     "program berjalan. Tampilkan dulu isi perintahnya, jangan "
+                     "langsung dijalankan.")
             if ("b64decode" in arg or "a85decode" in arg) and \
                     "decompress" in arg and once("python_b64_zlib_exec"):
                 _add(out, "python_b64_zlib_exec", 85,
                      "rantai exec/eval + base64 decode + zlib decompress",
-                     "Payload = base64 lalu zlib lalu exec. Hentikan sebelum "
-                     "exec: cetak hasil zlib.decompress(base64.b64decode(...)) "
-                     "untuk baca sumber. JANGAN eksekusi.")
+                     "Kode ini menyembunyikan perintah dengan cara "
+                     "memadatkan + menyandikannya, lalu menjalankannya. "
+                     "Berhenti sebelum bagian 'jalankan': buka/decode dan "
+                     "buka pemadatannya untuk dibaca. Jangan dieksekusi.")
 
         if short == "join" and isinstance(node.func, ast.Attribute) \
                 and isinstance(node.func.value, ast.Constant) \
@@ -82,8 +85,8 @@ def detect_python(text):
             if "chr" in arg and once("python_chr_join"):
                 _add(out, "python_chr_join", 65,
                      "pola ''.join(chr(...)) untuk membangun string",
-                     "String dibangun dari kode karakter. Evaluasi hanya "
-                     "bagian join(chr(...)) (bukan seluruh skrip) untuk "
-                     "memulihkan teks.")
+                     "Teks di kode ini dirakit dari kode angka setiap huruf "
+                     "agar tersembunyi. Ubah angka-angka itu kembali menjadi "
+                     "huruf untuk membacanya.")
 
     return out

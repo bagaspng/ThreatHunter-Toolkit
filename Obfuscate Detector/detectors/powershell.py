@@ -25,36 +25,42 @@ def detect_powershell(text):
     if _RE_ENC.search(text):
         _add(out, "ps_encoded_command", 90,
              "parameter -EncodedCommand/-enc + blob base64",
-             "Perintah PowerShell dikodekan base64 (UTF-16LE). Decode base64 "
-             "lalu decode teks UTF-16LE untuk baca; JANGAN jalankan.")
+             "Perintah PowerShell ini disembunyikan dalam bentuk kode base64. "
+             "Buka/decode base64-nya (teksnya dalam format UTF-16) untuk "
+             "membaca perintah aslinya. Jangan dijalankan.")
 
     if _RE_COMPRESS.search(text) and _RE_FROMB64.search(text):
         _add(out, "ps_compressed", 85,
              "DeflateStream/Gzip + FromBase64String",
-             "Payload = base64 lalu dekompresi Deflate/Gzip lalu jalan. "
-             "Decode base64 lalu inflate untuk baca sumber. JANGAN eksekusi.")
+             "Perintah disembunyikan dengan cara dipadatkan lalu disandikan, "
+             "kemudian dijalankan. Buka/decode lalu buka pemadatannya untuk "
+             "membaca. Jangan dieksekusi.")
     elif _RE_FROMB64.search(text):
         _add(out, "ps_frombase64", 80,
              "[Convert]::FromBase64String",
-             "Data base64 didekode saat runtime. Decode base64 untuk periksa; "
-             "hasil bisa biner/skrip.")
+             "Ada data base64 yang dibuka saat program berjalan. Buka/decode "
+             "base64-nya untuk memeriksa isinya (bisa berupa teks atau "
+             "program).")
 
     if _RE_JOIN.search(text) and _RE_CHAR.search(text):
         _add(out, "ps_char_join", 70,
              "-join dengan [char] (rakit string dari kode karakter)",
-             "String dirakit dari [char] kode. Kumpulkan kode karakter untuk "
-             "memulihkan teks.")
+             "Teks perintah dirakit dari kode angka setiap huruf agar "
+             "tersembunyi. Ubah angka-angkanya kembali menjadi huruf untuk "
+             "membacanya.")
 
     if _RE_FORMAT.search(text) and _RE_BACKTICK.search(text):
         _add(out, "ps_format_backtick", 60,
              "format-operator -f + backtick split",
-             "Obfuscate string via -f dan backtick. Rakit ulang format untuk "
-             "baca perintah asli.")
+             "Perintah disamarkan dengan menyusun potongan teks (operator -f) "
+             "dan tanda backtick. Susun ulang untuk membaca perintah "
+             "aslinya.")
 
     if _RE_IEX.search(text):
         _add(out, "ps_iex", 55,
              "IEX/Invoke-Expression (eksekusi string dinamis)",
-             "Eksekusi string dinamis. Sinyal lemah sendiri; periksa apakah "
-             "argumennya hasil decode.")
+             "Ada perintah yang menjalankan teks secara langsung (IEX). Ini "
+             "sinyal lemah; periksa apakah teksnya berasal dari sesuatu yang "
+             "dibuka/decode sebelumnya.")
 
     return out

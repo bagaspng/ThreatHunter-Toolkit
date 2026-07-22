@@ -34,10 +34,16 @@ def test_findings_sorted_by_confidence_desc():
     assert confs == sorted(confs, reverse=True)
 
 
-def test_verdict_has_risk_and_signals():
+def test_verdict_has_keyakinan_level_signals():
     v = engine.analyze("aGVsbG8gd29ybGQgc2FtcGxl")["verdict"]
-    assert "risk" in v and "signals" in v
-    assert 0 <= v["risk"] <= 100
+    assert "keyakinan" in v and "level" in v and "signals" in v
+    assert 0 <= v["keyakinan"] <= 100
+    assert v["level"] in ("Bersih", "Rendah", "Sedang", "Tinggi")
+
+
+def test_level_bersih_when_clean():
+    v = engine.analyze("halo, ini teks biasa untuk dibaca manusia.")["verdict"]
+    assert v["level"] == "Bersih"
 
 
 def test_aggregate_weak_signals_trip_verdict():
@@ -47,7 +53,7 @@ def test_aggregate_weak_signals_trip_verdict():
     v = engine.analyze(text)["verdict"]
     assert v["obfuscated"] is True
     assert v["signals"] >= 3
-    assert v["risk"] > v["score"]  # co-occurring signals boost risk above top
+    assert v["keyakinan"] > v["score"]  # co-occurring signals boost aggregate
 
 
 def test_single_weak_signal_not_obfuscated():

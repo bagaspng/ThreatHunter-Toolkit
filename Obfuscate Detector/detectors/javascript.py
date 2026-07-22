@@ -37,9 +37,11 @@ def detect_javascript(text):
     if _RE_PACKER.search(text):
         _add(out, "js_packer", 95,
              "signature Dean Edwards packer: eval(function(p,a,c,k,e,d))",
-             "Ini packer Dean Edwards. JANGAN eval. Ganti 'eval(' terakhir "
-             "dengan 'console.log(' / return untuk lihat sumber, atau pakai "
-             "de4js (mode 'Packer').")
+             "Kode JavaScript ini dibungkus dengan teknik 'packer' agar tidak "
+             "terbaca. Untuk melihat isi aslinya dengan aman (tanpa "
+             "menjalankannya), ganti perintah 'eval' di bagian akhir dengan "
+             "'console.log', atau pakai alat pembuka packer daring seperti "
+             "de4js.")
 
     hexnames = len(_RE_HEXNAME.findall(text))
     idx = len(_RE_ARRAY_IDX.findall(text))
@@ -47,57 +49,66 @@ def detect_javascript(text):
         _add(out, "obfuscator_io", 90,
              "%d identifier _0x + %d akses array _0x[..], gaya obfuscator.io"
              % (hexnames, idx),
-             "Kemungkinan output obfuscator.io. Pakai de4js atau Wakaru untuk "
-             "un-flatten string-array dan rename identifier.")
+             "Kode ini diacak oleh alat obfuscator.io (nama variabel berubah "
+             "jadi _0x...). Pakai alat pembuka daring seperti de4js untuk "
+             "merapikannya dan memulihkan teks aslinya.")
 
     fromchar = len(_RE_FROMCHAR.findall(text))
     if fromchar >= 3:
         _add(out, "js_fromcharcode", 70,
              "%d pemakaian String.fromCharCode(" % fromchar,
-             "String dibangun dari kode karakter. Kumpulkan argumen "
-             "fromCharCode lalu chr() di sisi analisis untuk baca string.")
+             "Teks di kode ini dibangun dari kode angka setiap huruf agar "
+             "tersembunyi. Kumpulkan angka-angkanya lalu ubah kembali menjadi "
+             "huruf untuk membacanya.")
 
     hexesc = len(_RE_HEX_ESC.findall(text))
     if hexesc >= 20:
         _add(out, "js_hex_escape", 65,
              "%d escape heksadesimal \\xNN di dalam string" % hexesc,
-             "Literal string disamarkan pakai \\xNN. Un-escape dengan "
-             "js-beautify atau CyberChef 'JS String' untuk baca teks asli.")
+             "Teks di kode ini disamarkan memakai kode heksadesimal (\\xNN). "
+             "Rapikan dengan alat penata kode (beautifier) untuk melihat teks "
+             "aslinya.")
 
     if idx >= 3:
         _add(out, "js_array_index", 75,
              "%d pola akses string via indeks array _0x[..]" % idx,
-             "Pola string-array lookup. Cari deklarasi array-nya, petakan "
-             "indeks -> nilai untuk memulihkan string.")
+             "Teks disimpan dalam sebuah daftar lalu dipanggil lewat nomor "
+             "urut agar sulit dibaca. Cari daftarnya, lalu cocokkan tiap "
+             "nomor dengan isinya untuk memulihkan teks.")
 
     if _RE_EVAL_ATOB.search(text):
         _add(out, "js_eval_atob", 75,
              "eval(atob(...)) — dekode lalu eksekusi payload saat runtime",
-             "Ada eval(atob()). Ganti eval dengan console.log untuk menangkap "
-             "payload tanpa menjalankannya.")
+             "Kode ini membuka lalu langsung menjalankan perintah yang "
+             "disembunyikan. Untuk melihat isinya dengan aman, ganti perintah "
+             "'eval' dengan 'console.log' supaya isinya ditampilkan, bukan "
+             "dijalankan.")
     elif _RE_DYN_DECODE.search(text):
         _add(out, "js_eval_atob", 40,
              "pemakaian unescape()/decodeURIComponent() (bisa sah untuk URL)",
-             "Dekode runtime terdeteksi. Sinyal lemah — sering dipakai wajar "
-             "untuk URL. Periksa apakah hasilnya di-eval/di-Function().")
+             "Ada pembukaan kode saat program berjalan. Ini sering wajar "
+             "untuk menangani alamat web, jadi belum tentu berbahaya. Periksa "
+             "apakah hasilnya kemudian dijalankan.")
 
     if _jsfuck_ratio(text) > 0.9:
         _add(out, "jsfuck", 95,
              "teks JS hampir seluruhnya simbol []()!+ (JSFuck)",
-             "JSFuck: JS dibangun dari 6 simbol. Tempel di JSFuck decoder, atau "
-             "ganti eval/Function terakhir dengan console.log untuk lihat "
-             "sumber. JANGAN eval mentah.")
+             "Kode ini ditulis hanya dengan simbol []()!+ (teknik JSFuck) agar "
+             "tidak terbaca. Pakai pembuka JSFuck daring, atau ganti perintah "
+             "di bagian akhir dengan 'console.log' agar isinya tampil tanpa "
+             "dijalankan.")
 
     if _RE_AAENCODE.search(text):
         _add(out, "aaencode", 95,
              "pola emoji Jepang (ﾟωﾟ) khas AAencode",
-             "AAencode. Ujungnya biasanya (ﾟΘﾟ)('...') — ganti pemanggil akhir "
-             "dengan console.log untuk lihat sumber.")
+             "Kode ini disamarkan menjadi bentuk 'emoji' Jepang (teknik "
+             "AAencode). Ganti pemanggil di bagian akhir dengan 'console.log' "
+             "untuk melihat isi aslinya tanpa menjalankannya.")
 
     if _RE_JJENCODE.search(text):
         _add(out, "jjencode", 90,
              "pola $=~[] khas JJencode",
-             "JJencode. Pakai decoder JJencode atau ganti eksekusi akhir "
-             "dengan log untuk pulihkan sumber.")
+             "Kode ini diacak dengan teknik JJencode (banyak simbol $). Pakai "
+             "pembuka JJencode daring untuk memulihkan isi aslinya.")
 
     return out

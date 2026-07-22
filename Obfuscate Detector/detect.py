@@ -16,7 +16,7 @@ import sys
 
 import engine
 
-_MAX_BYTES = 1_000_000
+_MAX_BYTES = 5_000_000
 _SKIP_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".pdf", ".zip",
              ".gz", ".xz", ".bz2", ".7z", ".rar", ".exe", ".dll", ".so",
              ".dylib", ".pyc", ".o", ".class", ".woff", ".woff2", ".ttf"}
@@ -53,10 +53,11 @@ def scan_path(path):
 def to_csv(results):
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["file", "obfuscated", "risk", "score", "dominant", "signals"])
+    w.writerow(["file", "obfuscated", "level", "keyakinan", "dominant",
+                "signals"])
     for r in results:
         v = r["verdict"]
-        w.writerow([r["file"], v["obfuscated"], v["risk"], v["score"],
+        w.writerow([r["file"], v["obfuscated"], v["level"], v["keyakinan"],
                     v["dominant"], v["signals"]])
     return buf.getvalue()
 
@@ -66,8 +67,8 @@ def to_table(results):
     for r in results:
         v = r["verdict"]
         flag = "OBF" if v["obfuscated"] else " - "
-        lines.append("[%s] risk=%3d  %-20s  %s"
-                     % (flag, v["risk"], v["dominant"] or "-", r["file"]))
+        lines.append("[%s] keyakinan %-7s %-20s  %s"
+                     % (flag, v["level"], v["dominant"] or "-", r["file"]))
     n_obf = sum(1 for r in results if r["verdict"]["obfuscated"])
     lines.append("--- %d file dipindai, %d obfuscated ---"
                  % (len(results), n_obf))

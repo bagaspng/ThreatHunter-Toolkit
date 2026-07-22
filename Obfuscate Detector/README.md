@@ -38,7 +38,10 @@ python -m pytest -v
 - Generik: entropy Shannon (global + sliding-window untuk blob tersembunyi),
   entropi nama identifier, rasio printable.
 
-Verdict memakai skor risiko agregat: satu sinyal kuat, atau beberapa sinyal
-lemah yang menumpuk, sama-sama menandai obfuscated.
+Verdict memakai tingkat keyakinan (Bersih/Rendah/Sedang/Tinggi): satu sinyal
+kuat, atau beberapa sinyal lemah yang menumpuk, sama-sama menandai obfuscated.
+Setiap temuan disertai clue berbahasa awam tentang cara membukanya.
+
+Batas ukuran masukan: 5 MB per berkas.
 
 Jaminan: response API / output CLI tidak pernah memuat teks hasil decode.

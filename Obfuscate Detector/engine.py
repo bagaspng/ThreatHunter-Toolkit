@@ -15,13 +15,23 @@ def assert_no_decode(findings):
         assert len(f.clue) < _MAX_FIELD, "clue terlalu panjang"
 
 
-def _risk(findings):
-    """Aggregate 0-100: top signal, boosted when several signals co-occur."""
+def _keyakinan(findings):
+    """Aggregate 0-100 confidence that the input is obfuscated."""
     if not findings:
         return 0
     top = findings[0].confidence
     contributing = sum(1 for f in findings if f.confidence >= _MODERATE)
     return min(100, top + 8 * max(0, contributing - 1))
+
+
+def _level(obfuscated, keyakinan):
+    if not obfuscated:
+        return "Bersih"
+    if keyakinan >= 85:
+        return "Tinggi"
+    if keyakinan >= 70:
+        return "Sedang"
+    return "Rendah"
 
 
 def analyze(text, type_hint=None):
@@ -41,10 +51,12 @@ def analyze(text, type_hint=None):
     obfuscated = strong or moderate >= 3
     dominant = findings[0].name if findings else None
     score = findings[0].confidence if findings else 0
+    keyakinan = _keyakinan(findings)
     return {
         "input_len": len(text),
         "verdict": {"obfuscated": obfuscated, "dominant": dominant,
-                    "score": score, "risk": _risk(findings),
+                    "score": score, "keyakinan": keyakinan,
+                    "level": _level(obfuscated, keyakinan),
                     "signals": len(findings)},
         "findings": [f.to_dict() for f in findings],
     }

@@ -4,7 +4,7 @@ from flask import Flask, jsonify, render_template, request
 import engine
 
 app = Flask(__name__)
-_MAX_BYTES = 1_000_000
+_MAX_BYTES = 5_000_000
 
 
 def _extract():
@@ -13,7 +13,7 @@ def _extract():
         if f and f.filename:
             data = f.read()
             if len(data) > _MAX_BYTES:
-                return None, None, "File terlalu besar (maks 1 MB)."
+                return None, None, "File terlalu besar (maks 5 MB)."
             return data.decode("utf-8", "replace"), request.form.get("type"), None
     if request.is_json:
         body = request.get_json(silent=True) or {}
@@ -29,7 +29,7 @@ def api_analyze():
     if not text or not text.strip():
         return jsonify({"error": "Input kosong."}), 400
     if len(text) > _MAX_BYTES:
-        return jsonify({"error": "Input terlalu besar (maks 1 MB)."}), 400
+        return jsonify({"error": "Input terlalu besar (maks 5 MB)."}), 400
     return jsonify(engine.analyze(text, type_hint))
 
 

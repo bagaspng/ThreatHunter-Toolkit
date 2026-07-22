@@ -30,16 +30,18 @@ def detect_unicode(text):
     if bidi >= 1:
         _add(out, "bidi_override", 85,
              "%d karakter bidi override (U+202A-202E / U+2066-2069)" % bidi,
-             "Karakter bidi dapat membalik urutan tampil kode tanpa mengubah "
-             "eksekusi (Trojan Source). Lihat byte mentah atau buang karakter "
-             "bidi untuk baca urutan asli.")
+             "Ada karakter khusus yang bisa membalik arah tampilan teks tanpa "
+             "mengubah cara kerjanya — trik untuk menipu pembaca (dikenal "
+             "sebagai 'Trojan Source'). Lihat berkas dalam bentuk mentah/hex, "
+             "atau hapus karakter tersebut untuk melihat urutan aslinya.")
 
     zw = sum(1 for c in text if ord(c) in _ZERO_WIDTH)
     if zw >= 4:
         _add(out, "zero_width", 80,
              "%d karakter zero-width (ZWSP/ZWNJ/ZWJ/BOM)" % zw,
-             "Karakter tak-terlihat dipakai menyisipkan/menyembunyikan data. "
-             "Buang zero-width atau lihat hex untuk ungkap konten tersembunyi.")
+             "Ada karakter 'tak terlihat' yang bisa dipakai menyembunyikan "
+             "data di dalam teks. Hapus karakter tak-terlihat itu, atau lihat "
+             "berkas dalam bentuk hex untuk mengungkap isi tersembunyinya.")
 
     cyr = _count_range(text, *_CYRILLIC)
     grk = _count_range(text, *_GREEK)
@@ -47,8 +49,9 @@ def detect_unicode(text):
         _add(out, "homoglyph_mix", 50,
              "campur Latin dengan Cyrillic(%d)/Greek(%d) - mungkin homoglyph"
              % (cyr, grk),
-             "Skrip campur bisa homoglyph (huruf mirip, mis. Cyrillic 'a'). "
-             "Normalisasi ke ASCII / cek confusables untuk temukan nama palsu. "
-             "Sinyal lemah - bisa juga teks multibahasa wajar.")
+             "Ada huruf dari abjad lain yang bentuknya mirip huruf Latin "
+             "(mis. huruf 'a' Cyrillic) — bisa dipakai memalsukan nama. Ini "
+             "sinyal lemah; bisa juga sekadar teks berbahasa campur yang "
+             "wajar.")
 
     return out

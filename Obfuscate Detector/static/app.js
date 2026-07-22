@@ -45,12 +45,12 @@ function render(data) {
     return;
   }
   const yes = data.verdict.obfuscated;
-  const risk = Number(data.verdict.risk) || 0;
+  const level = data.verdict.level || (yes ? "Rendah" : "Bersih");
   const signals = Number(data.verdict.signals) || 0;
   v.className = "verdict " + (yes ? "yes" : "no");
   v.textContent = yes
-    ? `OBFUSCATED — dominan: ${data.verdict.dominant} (${data.verdict.score}%) · risiko ${risk}/100 · ${signals} sinyal`
-    : `Bersih — tidak ada tanda obfuscate kuat. · risiko ${risk}/100 · ${signals} sinyal`;
+    ? `Terindikasi obfuscate — tingkat keyakinan: ${level}. Jenis dominan: ${data.verdict.dominant}. (${signals} tanda ditemukan)`
+    : `Tidak ada tanda obfuscate yang meyakinkan. (${signals} tanda lemah)`;
 
   $("findings").innerHTML = data.findings.map((f) => `
     <div class="finding">
