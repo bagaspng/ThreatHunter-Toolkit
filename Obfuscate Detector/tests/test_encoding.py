@@ -31,3 +31,14 @@ def test_plain_text_no_encoding_finding():
 
 def test_next_layer_returns_none_for_plain():
     assert next_layer("just normal words here") is None
+
+
+def test_base64_of_gzip_flagged_as_encoded_binary():
+    import gzip
+    blob = base64.b64encode(gzip.compress(b"secret payload bytes here")).decode()
+    findings = detect_encoding(blob)
+    names = [f.name for f in findings]
+    assert "encoded_binary" in names
+    eb = [f for f in findings if f.name == "encoded_binary"][0]
+    assert "gzip" in eb.evidence
+    assert "secret payload" not in eb.evidence  # zero-decode holds

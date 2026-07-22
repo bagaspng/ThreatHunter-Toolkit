@@ -75,7 +75,9 @@ def detect_python(text):
                      "exec: cetak hasil zlib.decompress(base64.b64decode(...)) "
                      "untuk baca sumber. JANGAN eksekusi.")
 
-        if short == "join":
+        if short == "join" and isinstance(node.func, ast.Attribute) \
+                and isinstance(node.func.value, ast.Constant) \
+                and isinstance(node.func.value.value, str):
             _, arg = _arg_call_names(node)
             if "chr" in arg and once("python_chr_join"):
                 _add(out, "python_chr_join", 65,

@@ -131,27 +131,93 @@ def _build_clue(seq):
             (seq[0], steps))
 
 
+_MAGIC = [
+    (b"\x1f\x8b", "gzip"),
+    (b"\x78\x9c", "zlib"), (b"\x78\x01", "zlib"), (b"\x78\xda", "zlib"),
+    (b"PK\x03\x04", "zip/jar/office"),
+    (b"MZ", "PE/EXE"),
+    (b"\x7fELF", "ELF"),
+    (b"%PDF", "PDF"),
+    (b"\xff\xd8\xff", "JPEG"),
+    (b"\x89PNG", "PNG"),
+    (b"Rar!", "RAR"),
+    (b"BZh", "bzip2"),
+    (b"\xfd7zXZ", "xz"),
+    (b"\xca\xfe\xba\xbe", "Java class"),
+]
+
+
+def _magic_name(data):
+    for sig, name in _MAGIC:
+        if data.startswith(sig):
+            return name
+    return None
+
+
+def _decode_bytes(text):
+    t = text.strip()
+    candidates = []
+    if _m_base64(t):
+        try:
+            candidates.append((base64.b64decode(t), "base64"))
+        except (ValueError, binascii.Error):
+            pass
+    if _m_base32(t):
+        try:
+            candidates.append((base64.b32decode(t), "base32"))
+        except (ValueError, binascii.Error):
+            pass
+    if _m_hex(t):
+        try:
+            candidates.append((bytes.fromhex(t), "hex"))
+        except ValueError:
+            pass
+    for data, scheme in candidates:
+        if _magic_name(data):
+            return data, scheme
+    return candidates[0] if candidates else (None, None)
+
+
 @register
 def detect_encoding(text):
     text = (text or "").strip()
+    out = []
+
     first = next_layer(text)
-    if first is None:
-        return []
-    name, decoded = first
-    ratio = _printable_ratio(decoded)  # used for confidence only
-    seq = [name]
-    cur = decoded
-    for _ in range(_MAX_DEPTH - 1):
-        nl = next_layer(cur)
-        if nl is None:
-            break
-        seq.append(nl[0])
-        cur = nl[1]
-    decoded = cur = None  # discard all decoded content (zero-decode invariant)
-    layers = len(seq)
-    conf = min(95, 60 + int(ratio * 30) + (5 if layers > 1 else 0))
-    evidence = "%d char, cocok pola %s" % (len(text), name)
-    if layers > 1:
-        evidence += ", terdeteksi %d lapisan (%s)" % (layers, " -> ".join(seq))
-    return [Finding(name=name, category="encoding", confidence=conf,
-                    evidence=evidence, clue=_build_clue(seq), layers=layers)]
+    if first is not None:
+        name, decoded = first
+        ratio = _printable_ratio(decoded)  # used for confidence only
+        seq = [name]
+        cur = decoded
+        for _ in range(_MAX_DEPTH - 1):
+            nl = next_layer(cur)
+            if nl is None:
+                break
+            seq.append(nl[0])
+            cur = nl[1]
+        decoded = cur = None  # discard decoded content (zero-decode invariant)
+        layers = len(seq)
+        conf = min(95, 60 + int(ratio * 30) + (5 if layers > 1 else 0))
+        evidence = "%d char, cocok pola %s" % (len(text), name)
+        if layers > 1:
+            evidence += ", terdeteksi %d lapisan (%s)" % (
+                layers, " -> ".join(seq))
+        out.append(Finding(name=name, category="encoding", confidence=conf,
+                           evidence=evidence, clue=_build_clue(seq),
+                           layers=layers))
+
+    # binary payload behind base64/base32/hex (e.g. base64-of-gzip / PE)
+    data, scheme = _decode_bytes(text)
+    if data is not None:
+        fmt = _magic_name(data)
+        data = None  # discard bytes (zero-decode invariant)
+        if fmt:
+            out.append(Finding(
+                name="encoded_binary", category="encoding", confidence=85,
+                evidence="%s membungkus data biner: header %s" % (scheme, fmt),
+                clue="%s membungkus berkas biner %s. Decode %s lalu simpan "
+                     "sebagai berkas dan buka sesuai format (mis. gunzip untuk "
+                     "gzip). JANGAN jalankan bila PE/ELF." % (scheme, fmt,
+                                                              scheme)))
+
+    return out

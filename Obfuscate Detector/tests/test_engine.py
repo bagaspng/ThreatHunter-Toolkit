@@ -32,3 +32,24 @@ def test_findings_sorted_by_confidence_desc():
     result = engine.analyze(code)
     confs = [f["confidence"] for f in result["findings"]]
     assert confs == sorted(confs, reverse=True)
+
+
+def test_verdict_has_risk_and_signals():
+    v = engine.analyze("aGVsbG8gd29ybGQgc2FtcGxl")["verdict"]
+    assert "risk" in v and "signals" in v
+    assert 0 <= v["risk"] <= 100
+
+
+def test_aggregate_weak_signals_trip_verdict():
+    # three moderate (40-59) signals, none individually >= 60
+    text = ("decodeURIComponent(x); IEX $y; "
+            "$z=chr(1).chr(2).chr(3).chr(4).chr(5).chr(6);")
+    v = engine.analyze(text)["verdict"]
+    assert v["obfuscated"] is True
+    assert v["signals"] >= 3
+    assert v["risk"] > v["score"]  # co-occurring signals boost risk above top
+
+
+def test_single_weak_signal_not_obfuscated():
+    v = engine.analyze("const q = decodeURIComponent(location.search);")["verdict"]
+    assert v["obfuscated"] is False

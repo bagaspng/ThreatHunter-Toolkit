@@ -29,6 +29,13 @@ def test_bare_decodeuri_is_weak_signal():
     assert atob[0].confidence < 60  # not verdict-triggering on its own
 
 
+def test_packer_with_whitespace_variant():
+    code = ("eval( function ( p , a , c , k , e , d ) { return p }"
+            "('0',1,1,['x'],0,{}))")
+    names = [f.name for f in detect_javascript(code)]
+    assert "js_packer" in names
+
+
 def test_jsfuck_detected():
     code = "[]+[]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[+!+[]]+(![]+[])[!+[]+!+[]]"
     names = [f.name for f in detect_javascript(code)]

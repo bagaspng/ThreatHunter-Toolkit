@@ -9,12 +9,28 @@ _RE_CONFUSE = re.compile(r"\b[lI1O0]{4,}\b")
 _RE_USCORE = re.compile(r"\b_{2,}\b")
 
 
+_WINDOW = 256
+_STEP = 128
+
+
 def shannon(s):
     if not s:
         return 0.0
     n = len(s)
     counts = Counter(s)
     return -sum((c / n) * math.log2(c / n) for c in counts.values())
+
+
+def max_window_entropy(text):
+    """Return (best_entropy, offset) over sliding windows; (global, 0) if short."""
+    if len(text) <= _WINDOW:
+        return shannon(text), 0
+    best, best_off = 0.0, 0
+    for i in range(0, len(text) - _WINDOW + 1, _STEP):
+        e = shannon(text[i:i + _WINDOW])
+        if e > best:
+            best, best_off = e, i
+    return best, best_off
 
 
 def _printable_ratio(s):
@@ -38,6 +54,17 @@ def detect_generic(text):
             clue="Entropi tinggi menandakan data terpaket/terenkripsi. "
                  "Cari fungsi decode (atob/unescape/base64) di sekitar blob "
                  "ini sebagai titik masuk."))
+    elif len(text) > _WINDOW:
+        went, woff = max_window_entropy(text)
+        if went > 5.0:
+            out.append(Finding(
+                name="embedded_high_entropy", category="generic",
+                confidence=min(85, 55 + int((went - 5.0) * 30)),
+                evidence="blob entropy tinggi %.2f di sekitar offset %d "
+                         "(file keseluruhan %.2f, rendah)" % (went, woff, ent),
+                clue="Ada blok pekat/terenkripsi tersembunyi dalam file yang "
+                     "secara keseluruhan tampak normal. Periksa sekitar offset "
+                     "itu; kemungkinan payload base64/terkompres disisipkan."))
 
     hexnames = len(_RE_HEXNAME.findall(text))
     confuse = len(_RE_CONFUSE.findall(text))

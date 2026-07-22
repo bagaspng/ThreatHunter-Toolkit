@@ -2,7 +2,9 @@ import re
 
 from detectors.base import Finding, register
 
-_RE_PACKER = re.compile(r"eval\(function\(p,a,c,k,e,[dr]?\)")
+_RE_PACKER = re.compile(
+    r"eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,"
+    r"\s*[dr]?\s*\)")
 _RE_HEXNAME = re.compile(r"_0x[0-9a-fA-F]{3,}")
 _RE_ARRAY_IDX = re.compile(r"_0x[0-9a-fA-F]+\[(?:0x)?[0-9a-fA-F]+\]")
 _RE_HEX_ESC = re.compile(r"\\x[0-9a-fA-F]{2}")

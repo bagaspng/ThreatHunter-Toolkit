@@ -31,3 +31,19 @@ def test_normal_underscores_not_flagged():
     code = "for _ in range(10):\n    pass\n_, __ = (1, 2)\nprint(__name__)"
     names = [f.name for f in detect_generic(code)]
     assert "underscore_mangle" not in names
+
+
+def test_embedded_high_entropy_blob():
+    import base64
+    filler = "config ok. " * 220  # ~2400 chars, very low entropy
+    blob = base64.b64encode(bytes(range(256))).decode()  # dense high-entropy
+    text = filler + blob + filler
+    names = [f.name for f in detect_generic(text)]
+    assert "embedded_high_entropy" in names
+    assert "high_entropy" not in names  # whole-file entropy stays low
+
+
+def test_uniform_low_entropy_no_embedded_flag():
+    text = "config ok. " * 220
+    names = [f.name for f in detect_generic(text)]
+    assert "embedded_high_entropy" not in names

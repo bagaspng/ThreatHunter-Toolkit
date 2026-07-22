@@ -34,6 +34,13 @@ def test_os_path_join_with_chr_not_flagged():
     assert "python_chr_join" not in names
 
 
+def test_os_path_join_with_nested_chr_not_flagged():
+    # chr nested inside os.path.join args must still not fire (receiver not str)
+    code = "import os\np = os.path.join(chr(47), 'tmp')"
+    names = [f.name for f in detect_python(code)]
+    assert "python_chr_join" not in names
+
+
 def test_exec_without_nested_marshal_not_flagged():
     code = "exec('print(1)')\nimport marshal\nd = marshal.dumps({})"
     names = [f.name for f in detect_python(code)]
