@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Obfuscate Detector</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand"><span class="dot"></span> Pure Python · Deteksi + Clue</div>
+      <h1>Obfuscate Detector</h1>
+      <p>Deteksi obfuscate, dapatkan petunjuk cara membukanya. Tanpa menampilkan hasil decode.</p>
+    </header>
+
+    <section class="card">
+      <label class="small" for="in">Kode / teks</label>
+      <textarea id="in" placeholder="Tempel kode atau teks di sini, atau unggah file..."></textarea>
+      <div class="counter" id="count">0 karakter</div>
+      <div class="row">
+        <button class="btn" id="run">Analisis</button>
+        <label class="file-btn">Unggah file
+          <input type="file" id="file" accept=".js,.py,.html,.htm,.css,.txt" hidden>
+        </label>
+        <button class="btn ghost" id="clear">Bersihkan</button>
+        <span class="file-name" id="fname"></span>
+      </div>
+    </section>
+
+    <section class="card" id="verdict-card" hidden>
+      <div class="verdict" id="verdict"></div>
+      <div id="findings"></div>
+    </section>
+
+    <footer>Berjalan di <code>127.0.0.1:8001</code> · clue-only, nol decode</footer>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
