@@ -1,5 +1,8 @@
 from detectors.base import all_detectors
-from detectors import encoding, generic, javascript, python_code  # noqa: F401
+from detectors import (  # noqa: F401
+    encoding, generic, javascript, php, powershell, python_code,
+    unicode_smuggle,
+)
 
 AMBANG = 60
 _MAX_FIELD = 2000

@@ -9,6 +9,17 @@ _RE_HEX_ESC = re.compile(r"\\x[0-9a-fA-F]{2}")
 _RE_FROMCHAR = re.compile(r"String\.fromCharCode\(")
 _RE_EVAL_ATOB = re.compile(r"eval\(\s*atob\(")
 _RE_DYN_DECODE = re.compile(r"\bunescape\(|\bdecodeURIComponent\(")
+_RE_AAENCODE = re.compile("ﾟωﾟ|ﾟΘﾟ|ﾟДﾟ|ﾟ∀ﾟ|ﾟｰﾟ")
+_RE_JJENCODE = re.compile(r"\$=~\[\]|\$\$\$\$|\$=\{")
+_JSFUCK_CHARS = frozenset("[]()!+")
+
+
+def _jsfuck_ratio(text):
+    stripped = [c for c in text if not c.isspace()]
+    if len(stripped) < 20:
+        return 0.0
+    hits = sum(1 for c in stripped if c in _JSFUCK_CHARS)
+    return hits / len(stripped)
 
 
 def _add(out, name, conf, evidence, clue):
@@ -67,5 +78,24 @@ def detect_javascript(text):
              "pemakaian unescape()/decodeURIComponent() (bisa sah untuk URL)",
              "Dekode runtime terdeteksi. Sinyal lemah — sering dipakai wajar "
              "untuk URL. Periksa apakah hasilnya di-eval/di-Function().")
+
+    if _jsfuck_ratio(text) > 0.9:
+        _add(out, "jsfuck", 95,
+             "teks JS hampir seluruhnya simbol []()!+ (JSFuck)",
+             "JSFuck: JS dibangun dari 6 simbol. Tempel di JSFuck decoder, atau "
+             "ganti eval/Function terakhir dengan console.log untuk lihat "
+             "sumber. JANGAN eval mentah.")
+
+    if _RE_AAENCODE.search(text):
+        _add(out, "aaencode", 95,
+             "pola emoji Jepang (ﾟωﾟ) khas AAencode",
+             "AAencode. Ujungnya biasanya (ﾟΘﾟ)('...') — ganti pemanggil akhir "
+             "dengan console.log untuk lihat sumber.")
+
+    if _RE_JJENCODE.search(text):
+        _add(out, "jjencode", 90,
+             "pola $=~[] khas JJencode",
+             "JJencode. Pakai decoder JJencode atau ganti eksekusi akhir "
+             "dengan log untuk pulihkan sumber.")
 
     return out

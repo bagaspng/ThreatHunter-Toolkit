@@ -29,6 +29,24 @@ def test_bare_decodeuri_is_weak_signal():
     assert atob[0].confidence < 60  # not verdict-triggering on its own
 
 
+def test_jsfuck_detected():
+    code = "[]+[]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[+!+[]]+(![]+[])[!+[]+!+[]]"
+    names = [f.name for f in detect_javascript(code)]
+    assert "jsfuck" in names
+
+
+def test_aaencode_detected():
+    code = "ﾟωﾟﾉ= /`m´）ﾉ ~┻━┻   //*´∇｀*/ ['_']; o=(ﾟｰﾟ)  =_=3;"
+    names = [f.name for f in detect_javascript(code)]
+    assert "aaencode" in names
+
+
+def test_jjencode_detected():
+    code = "$=~[];$={___:++$,$$$$:(![]+\"\")[$],__$:++$,$_$_:(![]+\"\")[$]};"
+    names = [f.name for f in detect_javascript(code)]
+    assert "jjencode" in names
+
+
 def test_clean_js_no_findings():
     code = "function add(a, b) { return a + b; }\nconsole.log(add(2, 3));"
     assert detect_javascript(code) == []
