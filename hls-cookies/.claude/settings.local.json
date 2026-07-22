@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/python -c \"import app; print\\('OK'\\)\")",
+      "Bash(venv/Scripts/python -c ' *)",
+      "Bash(venv/Scripts/python -c \"import app; print\\('import OK'\\)\")",
+      "Bash(venv/Scripts/pip list *)",
+      "Bash(venv/Scripts/python main.py)"
+    ]
+  }
+}
