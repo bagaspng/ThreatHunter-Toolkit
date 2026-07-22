@@ -6,6 +6,7 @@ from detectors.base import Finding, register
 
 _RE_HEXNAME = re.compile(r"_0x[0-9a-fA-F]{3,}")
 _RE_CONFUSE = re.compile(r"\b[lI1O0]{4,}\b")
+_RE_USCORE = re.compile(r"\b_{2,}\b")
 
 
 def shannon(s):
@@ -48,6 +49,18 @@ def detect_generic(text):
                      (hexnames, confuse),
             clue="Nama identifier di-mangle. Pakai beautifier + rename "
                  "(js-beautify, atau Wakaru/de4js untuk JS) agar terbaca."))
+
+    uscore = len(_RE_USCORE.findall(text))
+    if uscore >= 5:
+        out.append(Finding(
+            name="underscore_mangle", category="generic",
+            confidence=min(90, 55 + uscore * 3),
+            evidence="%d identifier underscore-only (_, __, ___ ...) — "
+                     "gaya lambda/pyfuscate" % uscore,
+            clue="Nama diganti deretan underscore + dispatch dinamis "
+                 "(__import__/getattr/globals). Beautify lalu rename; telusuri "
+                 "__import__/getattr untuk temukan API asli. JANGAN exec — "
+                 "cetak argumen exec/__import__ untuk lihat sumber."))
 
     ratio = _printable_ratio(text)
     if len(text) >= 32 and ratio < 0.85:
