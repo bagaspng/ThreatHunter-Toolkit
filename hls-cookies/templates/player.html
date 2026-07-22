@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCTV Dashboard — Polresta Bandar Lampung</title>
+<style>
+  :root {
+    --bg: #0a0d0a;
+    --sidebar: #0d110c;
+    --panel: #10140f;
+    --line: #1e2b1b;
+    --text: #c9d6c4;
+    --text-dim: #4d5e48;
+    --accent: #6ee06e;
+    --accent-dim: #2f5c2f;
+    --warn: #e0b16e;
+    --error: #e06e6e;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    flex-shrink: 0;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--sidebar);
+  }
+  header h1 { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  .header-meta {
+    font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 16px;
+  }
+  #totalCount, #activeCount { color: var(--accent); }
+
+  /* ── LAYOUT ── */
+  .layout { flex: 1; display: flex; min-height: 0; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 280px; flex-shrink: 0;
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    background: var(--sidebar);
+  }
+  .sidebar-search { padding: 10px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .sidebar-search input {
+    width: 100%; background: var(--bg); border: 1px solid var(--line);
+    color: var(--text); padding: 7px 10px; font-family: var(--mono); font-size: 11px; outline: none;
+  }
+  .sidebar-search input:focus { border-color: var(--accent-dim); }
+  .camera-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .camera-list::-webkit-scrollbar { width: 4px; }
+  .camera-list::-webkit-scrollbar-thumb { background: var(--line); }
+
+  .camera-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .camera-item:hover { background: rgba(110,224,110,0.04); }
+  .camera-item.active { background: rgba(110,224,110,0.07); border-left-color: var(--accent); }
+  .camera-item.inactive { opacity: 0.45; cursor: default; }
+  .cam-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .cam-dot.online { background: var(--accent); }
+  .cam-dot.offline { background: #444; }
+  .cam-name { font-size: 11px; line-height: 1.4; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── MAIN PANEL ── */
+  .main-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+
+  .cam-title-bar {
+    flex-shrink: 0; padding: 10px 20px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px;
+  }
+  #camTitle { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .badge-live { display: none; align-items: center; gap: 6px; font-size: 10px; color: var(--accent); letter-spacing: 0.08em; }
+  .badge-live.visible { display: inline-flex; }
+  .badge-live .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  .video-wrap { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; position: relative; min-height: 0; }
+  video { width: 100%; height: 100%; object-fit: contain; display: none; }
+  video.visible { display: block; }
+
+  .idle-msg { text-align: center; padding: 40px; color: var(--text-dim); font-size: 12px; line-height: 2; letter-spacing: 0.04em; pointer-events: none; }
+  .idle-msg b { color: var(--text); }
+
+  .offline-overlay {
+    display: none; position: absolute; inset: 0;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,.7); color: var(--error);
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none;
+  }
+  .offline-overlay.visible { display: flex; }
+
+  /* Stats bar */
+  .stats-bar { flex-shrink: 0; display: flex; gap: 0; border-top: 1px solid var(--line); background: var(--panel); }
+  .stat-item { flex: 1; padding: 8px 14px; border-right: 1px solid var(--line); font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-item:last-child { border-right: none; }
+  .stat-item b { display: block; font-size: 12px; color: var(--text); font-weight: 500; margin-top: 2px; letter-spacing: 0; }
+  .stat-item b.ok { color: var(--accent); }
+  .stat-item b.error { color: var(--error); }
+  .stat-item b.warn { color: var(--warn); }
+
+  /* Log panel */
+  .log-wrap { flex-shrink: 0; height: 110px; border-top: 1px solid var(--line); overflow-y: auto; padding: 6px 14px; background: var(--panel); }
+  .log-wrap::-webkit-scrollbar { width: 4px; }
+  .log-wrap::-webkit-scrollbar-thumb { background: var(--line); }
+  .log-row { display: flex; gap: 10px; padding: 1px 0; font-size: 10px; line-height: 1.6; }
+  .log-time { color: var(--text-dim); flex-shrink: 0; }
+  .log-msg.info { color: var(--text); }
+  .log-msg.ok { color: var(--accent); }
+  .log-msg.warn { color: var(--warn); }
+  .log-msg.error { color: var(--error); }
+
+  @media (max-width: 700px) { .sidebar { width: 200px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CCTV Monitor <span>// seribuwajah.bandarlampungkota</span></h1>
+  <div class="header-meta">
+    <span>Total: <span id="totalCount">—</span></span>
+    <span>Aktif: <span id="activeCount">—</span></span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="Cari nama kamera…" autocomplete="off">
+    </div>
+    <div class="camera-list" id="cameraList">
+      <div style="padding:16px 14px;font-size:11px;color:var(--text-dim)">Memuat daftar kamera…</div>
+    </div>
+  </aside>
+
+  <div class="main-panel">
+    <div class="cam-title-bar">
+      <span id="camTitle" style="color:var(--text-dim)">Pilih kamera dari daftar</span>
+      <span class="badge-live" id="liveBadge"><span class="dot"></span>LIVE</span>
+    </div>
+
+    <div class="video-wrap" id="videoWrap">
+      <div class="idle-msg" id="idleMsg">
+        Pilih kamera yang <b>Aktif</b> dari daftar sebelah kiri<br>
+        untuk mulai menonton live stream
+      </div>
+      <div class="offline-overlay" id="offlineOverlay">Stream tidak aktif</div>
+      <video id="video" autoplay muted playsinline></video>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-item">Status<b id="statStatus">Idle</b></div>
+      <div class="stat-item">Level<b id="statLevel">—</b></div>
+      <div class="stat-item">Bitrate<b id="statBitrate">—</b></div>
+      <div class="stat-item">Resolusi<b id="statRes">—</b></div>
+    </div>
+
+    <div class="log-wrap" id="logWrap"></div>
+  </div>
+</div>
+
+<!-- HLS.js -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script>
+(function () {
+
+  let allCameras = [];
+  let hls = null;
+  let currentCam = null;
+
+  const els = {
+    searchInput:    document.getElementById('searchInput'),
+    cameraList:     document.getElementById('cameraList'),
+    camTitle:       document.getElementById('camTitle'),
+    liveBadge:      document.getElementById('liveBadge'),
+    video:          document.getElementById('video'),
+    idleMsg:        document.getElementById('idleMsg'),
+    offlineOverlay: document.getElementById('offlineOverlay'),
+    statStatus:     document.getElementById('statStatus'),
+    statLevel:      document.getElementById('statLevel'),
+    statBitrate:    document.getElementById('statBitrate'),
+    statRes:        document.getElementById('statRes'),
+    logWrap:        document.getElementById('logWrap'),
+    totalCount:     document.getElementById('totalCount'),
+    activeCount:    document.getElementById('activeCount'),
+  };
+
+  // ── Logging ──
+  function log(msg, level = 'info') {
+    const row = document.createElement('div');
+    row.className = 'log-row';
+    const t = new Date().toLocaleTimeString('id-ID', { hour12: false });
+    row.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${level}">${msg}</span>`;
+    els.logWrap.appendChild(row);
+    els.logWrap.scrollTop = els.logWrap.scrollHeight;
+  }
+
+  function setStatus(text, cls = '') {
+    els.statStatus.textContent = text;
+    els.statStatus.className = cls;
+  }
+
+  // ── Camera list ──
+  async function loadCameras() {
+    log('Memuat daftar kamera…', 'info');
+    try {
+      const res = await fetch('/api/cameras');
+      const data = await res.json();
+      allCameras = data.cameras || [];
+      els.totalCount.textContent = allCameras.length;
+      els.activeCount.textContent = allCameras.filter(c => c.is_active).length;
+      renderList(allCameras);
+      log(`${allCameras.length} kamera dimuat.`, 'ok');
+    } catch (e) {
+      els.cameraList.innerHTML = '<div style="padding:16px 14px;font-size:11px;color:var(--error)">Gagal memuat kamera. Pastikan app.py berjalan.</div>';
+      log('Gagal memuat daftar kamera: ' + e.message, 'error');
+    }
+  }
+
+  function renderList(cameras) {
+    if (cameras.length === 0) {
+      els.cameraList.innerHTML = '<div style="padding:16px 14px;font-size:11px;color:var(--text-dim)">Tidak ada kamera ditemukan.</div>';
+      return;
+    }
+    els.cameraList.innerHTML = '';
+    cameras.forEach(cam => {
+      const item = document.createElement('div');
+      item.className = 'camera-item' + (cam.is_active ? '' : ' inactive');
+      item.dataset.id = cam.id;
+      item.innerHTML = `
+        <span class="cam-dot ${cam.is_active ? 'online' : 'offline'}"></span>
+        <span class="cam-name" title="${cam.name}">${cam.name}</span>`;
+      if (cam.is_active) item.addEventListener('click', () => selectCamera(cam));
+      els.cameraList.appendChild(item);
+    });
+  }
+
+  els.searchInput.addEventListener('input', () => {
+    const q = els.searchInput.value.trim().toLowerCase();
+    renderList(q ? allCameras.filter(c => c.name.toLowerCase().includes(q)) : allCameras);
+  });
+
+  // ── Select & play ──
+  function selectCamera(cam) {
+    if (currentCam && currentCam.id === cam.id) return;
+    stopStream();
+    currentCam = cam;
+
+    document.querySelectorAll('.camera-item').forEach(el => el.classList.remove('active'));
+    const item = document.querySelector(`.camera-item[data-id="${cam.id}"]`);
+    if (item) item.classList.add('active');
+
+    els.camTitle.textContent = cam.name;
+    els.camTitle.style.color = 'var(--text)';
+    els.idleMsg.style.display = 'none';
+    els.offlineOverlay.classList.remove('visible');
+    els.video.classList.remove('visible');
+
+    if (!cam.is_active || !cam.proxy_url) {
+      els.offlineOverlay.classList.add('visible');
+      setStatus('Tidak Aktif', 'error');
+      log(`${cam.name} — stream tidak aktif.`, 'warn');
+      return;
+    }
+
+    log(`Memulai stream: ${cam.name}`, 'info');
+    startHls(cam.proxy_url, cam.name);
+  }
+
+  // ── HLS.js player ──
+  function startHls(proxyUrl, name) {
+    if (!Hls.isSupported()) {
+      // Fallback: browser native HLS (Safari)
+      if (els.video.canPlayType('application/vnd.apple.mpegurl')) {
+        els.video.src = proxyUrl;
+        els.video.classList.add('visible');
+        els.video.play().catch(() => {});
+        setStatus('Live (native)', 'ok');
+        els.liveBadge.classList.add('visible');
+        log('HLS native playback (Safari).', 'ok');
+      } else {
+        log('Browser tidak mendukung HLS.', 'error');
+        setStatus('Error', 'error');
+      }
+      return;
+    }
+
+    hls = new Hls({
+      // Tidak pakai xhrSetup credentials — proxy lokal yang handle cookie
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 30,
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 10,
+    });
+
+    hls.loadSource(proxyUrl);
+    hls.attachMedia(els.video);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+      log(`Manifest parsed — ${data.levels.length} level.`, 'ok');
+      els.video.classList.add('visible');
+      els.video.play().catch(() => {});
+      setStatus('Live', 'ok');
+      els.liveBadge.classList.add('visible');
+    });
+
+    hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+      const lvl = hls.levels[data.level];
+      if (lvl) {
+        els.statLevel.textContent = `L${data.level}`;
+        els.statBitrate.textContent = Math.round(lvl.bitrate / 1000) + ' kbps';
+        els.statRes.textContent = lvl.width ? `${lvl.width}×${lvl.height}` : '—';
+      }
+    });
+
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data.fatal) {
+        log(`Fatal HLS error: ${data.type} / ${data.details}`, 'error');
+        setStatus('Error', 'error');
+        els.liveBadge.classList.remove('visible');
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          log('Network error — mencoba recovery…', 'warn');
+          hls.startLoad();
+        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          log('Media error — mencoba recoverMedia…', 'warn');
+          hls.recoverMediaError();
+        } else {
+          stopStream();
+        }
+      } else {
+        log(`HLS warn: ${data.details}`, 'warn');
+      }
+    });
+  }
+
+  function stopStream() {
+    if (hls) { hls.destroy(); hls = null; }
+    els.video.src = '';
+    els.video.classList.remove('visible');
+    els.liveBadge.classList.remove('visible');
+    els.offlineOverlay.classList.remove('visible');
+    els.statLevel.textContent = '—';
+    els.statBitrate.textContent = '—';
+    els.statRes.textContent = '—';
+    setStatus('Idle');
+  }
+
+  // ── Init ──
+  log('Dashboard siap.', 'info');
+  loadCameras();
+
+})();
+</script>
+</body>
+</html>
