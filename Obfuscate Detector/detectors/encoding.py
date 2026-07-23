@@ -122,13 +122,18 @@ def next_layer(text):
 
 
 def _build_clue(seq):
-    steps = " lalu ".join("decode %s" % n for n in seq)
+    steps = ", lalu buka lagi dengan ".join(seq)
     if len(seq) > 1:
-        return ("Terdeteksi %d lapisan. Urutan dugaan: %s. Cek hasil di "
-                "CyberChef 'Magic'. Lapisan dalam bisa gzip/zlib bila hasil "
-                "masih biner." % (len(seq), steps))
-    return ("Terlihat %s. Coba %s. Verifikasi di CyberChef 'Magic'." %
-            (seq[0], steps))
+        return ("Isi teks ini disembunyikan dengan cara disandikan (encoding) "
+                "berlapis %d kali — bukan dikunci/enkripsi, jadi bisa dibuka. "
+                "Buka lapisan satu per satu: %s. Kamu bisa memakai situs "
+                "pembuka kode gratis seperti CyberChef. Kalau setelah dibuka "
+                "hasilnya masih berupa data acak, mungkin di dalamnya ada "
+                "berkas yang dipadatkan (zip/gzip)." % (len(seq), steps))
+    return ("Isi teks ini disembunyikan dengan penyandian %s (cara umum "
+            "menyamarkan teks, bukan enkripsi). Buka/decode %s untuk melihat "
+            "isi aslinya — bisa lewat situs gratis seperti CyberChef." %
+            (seq[0], seq[0]))
 
 
 _MAGIC = [
@@ -215,9 +220,11 @@ def detect_encoding(text):
             out.append(Finding(
                 name="encoded_binary", category="encoding", confidence=85,
                 evidence="%s membungkus data biner: header %s" % (scheme, fmt),
-                clue="%s membungkus berkas biner %s. Decode %s lalu simpan "
-                     "sebagai berkas dan buka sesuai format (mis. gunzip untuk "
-                     "gzip). JANGAN jalankan bila PE/ELF." % (scheme, fmt,
-                                                              scheme)))
+                clue="Teks ini sebenarnya sebuah berkas (%s) yang disamarkan "
+                     "menjadi teks lewat penyandian %s — trik yang sering "
+                     "dipakai untuk menyelundupkan program. Buka/decode %s "
+                     "lalu simpan sebagai berkas. HATI-HATI: jangan dijalankan "
+                     "kalau berupa program (PE/EXE atau ELF)." % (fmt, scheme,
+                                                                  scheme)))
 
     return out

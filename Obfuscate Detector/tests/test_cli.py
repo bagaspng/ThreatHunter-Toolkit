@@ -35,7 +35,8 @@ def test_csv_header(tmp_path):
     f = tmp_path / "x.txt"
     f.write_text("halo teks biasa saja tanpa apa-apa")
     out = detect.to_csv(detect.scan_path(str(f)))
-    assert out.splitlines()[0] == "file,obfuscated,risk,score,dominant,signals"
+    assert out.splitlines()[0] == (
+        "file,obfuscated,level,keyakinan,dominant,signals")
 
 
 def test_fail_on_detect_exit_code(tmp_path):

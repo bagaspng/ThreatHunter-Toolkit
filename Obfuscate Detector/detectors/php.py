@@ -28,29 +28,33 @@ def detect_php(text):
     if _RE_EVAL_DECODE.search(text):
         _add(out, "php_eval_decode", 90,
              "eval/assert atas rantai decode (base64/gzinflate/str_rot13 ...)",
-             "Payload PHP di-decode lalu dieksekusi (khas webshell). JANGAN "
-             "jalankan. Ganti eval dengan echo untuk lihat sumber; decode "
-             "manual berlapis (base64 -> gzinflate) di CyberChef.")
+             "Ini ciri khas 'webshell' PHP: perintah tersembunyi dibuka lalu "
+             "langsung dijalankan di server. Jangan dijalankan. Untuk melihat "
+             "isinya, ganti perintah 'eval' dengan 'echo' agar hanya "
+             "ditampilkan.")
 
     if _RE_PREG_E.search(text):
         _add(out, "php_preg_e", 85,
              "preg_replace dengan modifier /e (mengeksekusi replacement)",
-             "Modifier /e menjalankan string replacement sebagai kode PHP. "
-             "Baca argumen replacement sebagai kode, bukan teks.")
+             "Kode ini memakai trik lama PHP (preg_replace dengan tanda /e) "
+             "untuk menjalankan teks sebagai perintah. Baca bagian "
+             "penggantinya sebagai perintah, bukan sebagai teks biasa.")
 
     g = len(_RE_GLOBALS.findall(text))
     vv = len(_RE_VARVAR.findall(text))
     if g >= 3 or vv >= 2:
         _add(out, "php_globals_obf", 70,
              "%d $GLOBALS[...] + %d variable-variable $$" % (g, vv),
-             "Dispatch lewat $GLOBALS/variable-variable menyamarkan alur. "
-             "Petakan nama variabel untuk memulihkan logika.")
+             "Kode ini menyembunyikan alur kerjanya lewat variabel global dan "
+             "variabel-berlapis agar sulit diikuti. Catat nilai tiap variabel "
+             "untuk memahami maksud sebenarnya.")
 
     cc = len(_RE_CHR_CONCAT.findall(text))
     if cc >= 5:
         _add(out, "php_char_concat", 55,
              "%d chr(n). dirangkai membangun string/kode" % cc,
-             "String dibangun dari chr(). Kumpulkan nilai chr lalu konversi "
-             "untuk baca. Sinyal lemah.")
+             "Teks dirakit dari kode angka setiap huruf agar tersembunyi. Ini "
+             "sinyal lemah; ubah angka-angkanya menjadi huruf untuk "
+             "membacanya.")
 
     return out
