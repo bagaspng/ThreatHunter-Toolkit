@@ -12,7 +12,7 @@ Berikut adalah penjelasan singkat untuk masing-masing direktori proyek di dalam 
 
 ### 2. [hls-juicycode](./hls-juicycode)
 
-**Proxy Film & JuicyCodes Decoder.** Alat otomasi _all-in-one_ untuk melakukan bypass enkripsi pada pemutar video bajakan (seperti JuicyCodes). Menggunakan **Node.js Sandbox** untuk mendekode _payload_ terenkripsi secara aman, lalu memainkannya via proksi HLS lokal untuk menghindari deteksi Cloudflare.
+**Proxy Film & JuicyCodes Decoder.** Alat otomasi _all-in-one_ untuk melakukan bypass enkripsi pada pemutar video bajakan (seperti JuicyCodes). Menggunakan **Node.js Sandbox** untuk mendekode _payload_ terenkripsi secara aman.
 
 ### 3. [hls-proxy](./hls-proxy)
 
