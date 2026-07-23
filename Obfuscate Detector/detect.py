@@ -16,7 +16,6 @@ import sys
 
 import engine
 
-_MAX_BYTES = 5_000_000
 _SKIP_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".pdf", ".zip",
              ".gz", ".xz", ".bz2", ".7z", ".rar", ".exe", ".dll", ".so",
              ".dylib", ".pyc", ".o", ".class", ".woff", ".woff2", ".ttf"}
@@ -39,10 +38,8 @@ def scan_path(path):
             continue
         try:
             with open(fp, "rb") as fh:
-                data = fh.read(_MAX_BYTES + 1)
+                data = fh.read()
         except OSError:
-            continue
-        if len(data) > _MAX_BYTES:
             continue
         res = engine.analyze(data.decode("utf-8", "replace"))
         out.append({"file": fp, "verdict": res["verdict"],

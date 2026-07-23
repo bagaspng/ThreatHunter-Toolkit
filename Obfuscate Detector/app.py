@@ -4,7 +4,8 @@ from flask import Flask, jsonify, render_template, request
 import engine
 
 app = Flask(__name__)
-_MAX_BYTES = 5_000_000
+# Tanpa batas ukuran masukan (hanya dibatasi memori yang tersedia).
+app.config["MAX_CONTENT_LENGTH"] = None
 
 
 def _extract():
@@ -12,24 +13,18 @@ def _extract():
         f = request.files["file"]
         if f and f.filename:
             data = f.read()
-            if len(data) > _MAX_BYTES:
-                return None, None, "File terlalu besar (maks 5 MB)."
-            return data.decode("utf-8", "replace"), request.form.get("type"), None
+            return data.decode("utf-8", "replace"), request.form.get("type")
     if request.is_json:
         body = request.get_json(silent=True) or {}
-        return body.get("text"), body.get("type"), None
-    return request.form.get("text"), request.form.get("type"), None
+        return body.get("text"), body.get("type")
+    return request.form.get("text"), request.form.get("type")
 
 
 @app.route("/api/analyze", methods=["POST"])
 def api_analyze():
-    text, type_hint, err = _extract()
-    if err:
-        return jsonify({"error": err}), 400
+    text, type_hint = _extract()
     if not text or not text.strip():
         return jsonify({"error": "Input kosong."}), 400
-    if len(text) > _MAX_BYTES:
-        return jsonify({"error": "Input terlalu besar (maks 5 MB)."}), 400
     return jsonify(engine.analyze(text, type_hint))
 
 

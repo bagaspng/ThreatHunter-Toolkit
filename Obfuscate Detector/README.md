@@ -42,6 +42,6 @@ Verdict memakai tingkat keyakinan (Bersih/Rendah/Sedang/Tinggi): satu sinyal
 kuat, atau beberapa sinyal lemah yang menumpuk, sama-sama menandai obfuscated.
 Setiap temuan disertai clue berbahasa awam tentang cara membukanya.
 
-Batas ukuran masukan: 5 MB per berkas.
+Tanpa batas ukuran masukan (hanya dibatasi memori yang tersedia).
 
 Jaminan: response API / output CLI tidak pernah memuat teks hasil decode.
