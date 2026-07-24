@@ -486,7 +486,7 @@ def index():
                 log('Memulai rantai pemutaran video...', 'info');
 
                 // Deteksi otomatis format stream (HLS .m3u8 vs Direct Stream)
-                var isHls = rawUrl.toLowerCase().includes('.m3u8');
+                var isHls = rawUrl.toLowerCase().includes('.m3u8') || rawUrl.toLowerCase().includes('/stream/');
 
                 if (isHls) {
                     log('Tipe terdeteksi: HLS Playlist (.m3u8)', 'info');
@@ -649,13 +649,23 @@ def hls_master():
     host = request.host_url.rstrip("/")
     new_lines = []
 
+    is_variant = '#EXTINF:' in playlist
     for line in playlist.splitlines():
-        if line.startswith("http") and line.endswith(".m3u8"):
-            ref_param = f"&referer={quote(referer)}" if referer else ""
-            proxy = f"{host}/api/v1/hls/variant?url={quote(line, safe='')}{ref_param}"
-            new_lines.append(proxy)
-        else:
+        if line.startswith("#"):
             new_lines.append(line)
+            continue
+        if not line.strip():
+            new_lines.append(line)
+            continue
+            
+        ref_param = f"&referer={quote(referer)}" if referer else ""
+        
+        if is_variant:
+            proxy = f"{host}/api/v1/hls/segment?url={quote(line, safe='')}{ref_param}"
+        else:
+            proxy = f"{host}/api/v1/hls/variant?url={quote(line, safe='')}{ref_param}"
+            
+        new_lines.append(proxy)
 
     return Response("\n".join(new_lines), mimetype="application/vnd.apple.mpegurl")
 
@@ -835,4 +845,4 @@ def video_stream():
         return f"Proxy Error: {str(e)}", 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8001, debug=True)
