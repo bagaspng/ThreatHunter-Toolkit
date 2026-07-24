@@ -1,208 +1,212 @@
-# HLS Cookies Proxy for CCTV Portal
+# HLS Cookie Proxy
 
-Project ini adalah stack Python untuk mengakses stream CCTV berbasis HLS (`.m3u8` + segmen `.ts`) yang dilindungi cookie sesi lintas subdomain.
+HLS Cookie Proxy adalah backend Python untuk mem-proxy stream CCTV berbasis HLS (`.m3u8` dan segment seperti `.ts`, `.m4s`, `.mp4`, `.aac`) yang membutuhkan cookie lintas subdomain. Setelah migrasi, runtime HTTP utama adalah Django: Django melayani halaman player lokal, daftar kamera, dan endpoint proxy HLS. Flask di `app.py` masih dipertahankan sebagai legacy compatibility layer, tetapi bukan entrypoint utama.
 
-Repositori ini punya 3 komponen utama:
+## Status Arsitektur Saat Ini
 
-1. **Cookie Scraper Service** (`cookies-exp.py`)
-2. **Camera Discovery/Prober** (`main.py`)
-3. **HLS Proxy + Web Player** (`app.py` + `templates/player.html`)
+Komponen utama proyek:
 
-Tujuan utamanya adalah menjaga agar browser klien hanya bicara ke server lokal, sementara proxy yang menangani cookie dan request ke server stream eksternal.
+- `django_config/`: konfigurasi Django, URL root, ASGI/WSGI, dan Celery app.
+- `proxy_api/`: endpoint DRF, wiring service, serializer, dan Celery task refresh cookie.
+- `core/`: logika framework-agnostic untuk cookie store, handshake kamera, playlist rewrite, HLS client, segment cache, Range parser, dan validasi URL.
+- `upstream_auth/`: Selenium refresher importable untuk mengambil base cookies.
+- `scraper/` dan `main.py`: camera discovery/prober, tetap opsional.
+- `templates/player.html`: halaman player yang dirender oleh Django di `/player`.
+- `app.py`: legacy Flask compatibility surface.
+- `tests/`: unit dan integration tests dengan mocked upstream, fake Redis, dan task Celery eager/apply.
 
----
+## Endpoint Publik Utama
 
-## Kenapa Project Ini Diperlukan?
+Django mengekspos halaman player, daftar kamera, dan tiga endpoint proxy utama:
 
-Server stream CCTV tidak cukup hanya diakses dengan URL `index.m3u8`. Ia butuh cookie sesi seperti `cctv_access`, `stream_token`, `hlsSession`, dan `cookieCheck`.
+- `GET /player`
+- `GET /api/cameras`
+- `GET /proxy/playlist?url=...`
+- `GET /proxy/segment?url=...`
+- `POST /api/refresh-cookies`
 
-- Cookie biasanya terbentuk setelah mengunjungi portal utama.
-- Cookie tertentu terikat domain/path spesifik.
-- Jika cookie hilang/expired, stream biasanya gagal (`401`/`403`).
+Route Flask legacy untuk endpoint proxy yang sama diberi header `Deprecation: true` dan sebaiknya tidak dipakai sebagai runtime produksi.
 
-Project ini menangani masalah itu dengan:
+## Alur Kerja Singkat
 
-- scraping dan refresh cookie otomatis via Selenium,
-- menyimpan cookie ke cache lokal,
-- mem-proxy playlist dan segmen agar playback tetap jalan dari origin lokal.
-
----
-
-## Arsitektur Singkat
-
-```mermaid
-flowchart LR
-  A[Browser - player] --> B[Flask Proxy app.py]
-  B --> C[Stream CDN m3u8 and ts]
-  B --> D[Cookie Cache output/cookies_cache.json]
-  E[Selenium Service cookies-exp.py] --> D
-  B --> E
-  F[Camera Prober main.py] --> G[output/cameras.json]
-  B --> G
-```
-
-Alur runtime utama:
-
-1. `cookies-exp.py` menavigasi portal/stream, lalu mengambil cookie (termasuk lintas domain via CDP).
-2. Cookie dinormalisasi dan disimpan ke `output/cookies_cache.json`.
-3. `app.py` membangun `requests.Session` dari cookie cache.
-4. Endpoint `/proxy/playlist` mengambil `m3u8`, rewrite URL segmen/sub-playlist ke endpoint lokal.
-5. Endpoint `/proxy/segment` mengambil segmen `.ts`/`.m4s` memakai session cookie yang sama.
-6. `player.html` memutar stream via HLS.js dari endpoint proxy lokal.
-
----
+1. Base cookies (`cctv_access`, `stream_token`) diperoleh oleh Celery task yang menjalankan Selenium refresher.
+2. Base cookies, camera cookies, refresh status, version, dan refresh lock disimpan di Redis jika `COOKIE_STORE_BACKEND=redis`.
+3. Saat playlist diminta, service membangun `requests.Session` dari cookie snapshot, melakukan handshake kamera, lalu rewrite URL playlist agar browser tetap lewat proxy lokal.
+4. Saat segment diminta, service meneruskan header penting seperti `Range`, menjaga status/header upstream aman, dan memakai cache disk lokal untuk response penuh `200`.
+5. Jika base cookie belum tersedia atau sedang refresh, playlist dapat mengembalikan `503` dengan `Retry-After`.
 
 ## Struktur Folder
 
 ```text
 .
-├── app.py
-├── main.py
-├── cookies-exp.py
-├── config.py
-├── requirements.txt
-├── scraper/
-│   ├── __init__.py
-│   ├── extractor.py
-│   ├── models.py
-│   ├── utils.py
-│   └── exceptions.py
-├── templates/
-│   └── player.html
-├── output/
-│   ├── cameras.json
-│   └── cookies_cache.json
-└── cache_segments/
+├── core/                    # Domain logic tanpa Flask/DRF coupling
+├── django_config/           # Django settings, urls, ASGI/WSGI, Celery app
+├── proxy_api/               # DRF views, service wiring, serializers, Celery tasks
+├── scraper/                 # Camera scraping/probing helpers
+├── templates/               # Django player template
+├── tests/                   # Unit + integration tests mocked upstream
+├── upstream_auth/           # Selenium base-cookie refresher
+├── app.py                   # Legacy Flask compatibility layer
+├── cookies-exp.py           # Optional one-shot Selenium refresh CLI
+├── main.py                  # Optional camera discovery/prober
+├── manage.py                # Django management entrypoint
+├── config.py                # Konstanta upstream dan default runtime
+├── requirements.txt         # Python dependencies
+├── README.md                # Dokumentasi operasional
+└── AGENT.md                 # Konteks teknis untuk agent/developer
 ```
 
----
+Folder/file runtime yang sengaja tidak dilacak git:
 
-## Prasyarat
-
-- Python 3.10+
-- Google Chrome/Chromium
-- ChromeDriver kompatibel
-- OS Windows/Linux (script sudah lintas platform, tetapi path ChromeDriver di `cookies-exp.py` lebih condong Linux pada default)
-
-> Catatan: `build_chrome_driver()` mencoba path `/usr/bin/chromedriver` lalu fallback ke PATH environment. Di Windows, pastikan ChromeDriver tersedia di PATH jika tidak pakai Linux path.
-
----
+- `cache_segments/`
+- `output/`
+- `cookies.json`
+- `.env*`
+- `venv/`
+- `__pycache__/`
 
 ## Instalasi
 
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## Cara Menjalankan
-
-### 1) Jalankan cookie service
+Gunakan virtual environment lokal.
 
 ```bash
-python cookies-exp.py --port 5001
+python -m venv venv
+venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 2) Ambil daftar kamera (opsional tapi direkomendasikan)
+Di PowerShell, aktivasi opsional:
 
-Mode API backend:
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+## Environment Variables
+
+Untuk development, default di `django_config/settings.py` masih bisa berjalan dengan fallback JSON. Untuk production-like setup gunakan Redis.
+
+Minimal production-like:
+
+```powershell
+$env:DJANGO_DEBUG = "0"
+$env:DJANGO_SECRET_KEY = "ganti-dengan-secret-lokal"
+$env:DJANGO_ALLOWED_HOSTS = "localhost,127.0.0.1"
+$env:COOKIE_STORE_BACKEND = "redis"
+$env:REDIS_URL = "redis://localhost:6379/0"
+$env:CELERY_BROKER_URL = "redis://localhost:6379/0"
+$env:CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+```
+
+Opsional:
+
+- `COOKIE_BASE_TTL_SECONDS`
+- `COOKIE_CAMERA_TTL_SECONDS`
+- `COOKIE_REFRESH_LOCK_TTL_SECONDS`
+- `REFRESH_WAIT_TIMEOUT_SECONDS`
+
+Nilai upstream, referer, allowlist host, timeout, dan lokasi output default berada di `config.py`.
+
+## Menjalankan Django API
 
 ```bash
-python main.py
+venv\Scripts\python.exe manage.py check
+venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000
 ```
 
-Mode probe sequential:
+Endpoint akan tersedia di `http://localhost:8000`. Buka player di `http://localhost:8000/player`.
+
+## Menjalankan Redis
+
+Redis diperlukan untuk shared state produksi. Jalankan Redis sebagai service internal, bukan port publik internet.
+
+Contoh dengan Docker:
 
 ```bash
-python main.py --probe 50 --workers 10
+docker run --rm -p 6379:6379 redis:7
 ```
 
-### 3) Jalankan proxy + player
+Jika tidak memakai Docker, jalankan Redis sesuai OS/deployment masing-masing lalu sesuaikan `REDIS_URL`.
+
+## Menjalankan Celery Worker
+
+Worker menjalankan Selenium refresh dan tidak membuka HTTP port publik.
 
 ```bash
-python app.py
+venv\Scripts\celery.exe -A django_config worker -l info
 ```
 
-### 4) Buka dashboard player
+Di environment Linux/macOS biasanya:
 
-- `http://localhost:5000/player`
+```bash
+celery -A django_config worker -l info
+```
 
----
+## Refresh Cookie
 
-## Endpoint Penting
+Trigger refresh:
 
-### Dari `app.py`
+```bash
+curl -X POST http://localhost:8000/api/refresh-cookies ^
+  -H "Content-Type: application/json" ^
+  -d "{\"force\":true,\"wait\":false}"
+```
 
-- `GET /` : health/info endpoint.
-- `POST /api/refresh-cookies` : refresh cookie dari Selenium service.
-- `GET /api/cameras` : baca `output/cameras.json`.
-- `POST /api/scrape` : fetch ulang daftar kamera dari API backend.
-- `GET /api/debug-session` : inspeksi cookie aktif di session proxy.
-- `POST /api/inject-cookies` : inject cookie manual ke session aktif.
-- `GET /proxy/playlist?url=...` : proxy + rewrite file `.m3u8`.
-- `GET /proxy/segment?url=...` : proxy segmen video/audio.
+Kontrak response utama:
 
-### Dari `cookies-exp.py`
+- `200 ready`: cookie sudah tersedia dan masih valid.
+- `202 refreshing`: task refresh sedang berjalan atau baru dibuat.
+- `503 failed`: refresh tidak berhasil atau belum siap dipakai.
 
-- `GET /` : health check service.
-- `POST /scrape` : scraping cookie berbasis URL target.
-- `POST /import` : import cookie manual lewat JSON body.
+## Mengakses Playlist dan Segment
 
----
+Contoh playlist:
 
-## File Konfigurasi
+```text
+http://localhost:8000/proxy/playlist?url=https%3A%2F%2Fstream-newseribuwajah.bandarlampungkota.go.id%2Fcctv_18%2Findex.m3u8
+```
 
-Atur nilai default di `config.py`:
+Playlist yang dikembalikan akan rewrite URL child playlist dan binary resource agar tetap melewati `/proxy/playlist` atau `/proxy/segment`.
 
-- `PORTAL_URL`
-- `STREAM_REFERER`
-- `CAMERAS_OUTPUT_FILE`
-- `COOKIES_CACHE_FILE`
-- `COOKIES_MANUAL_FILE`
-- `COOKIE_SERVICE_URL`
-- `PROXY_HOST`, `PROXY_PORT`
-- `TIMEOUT`
+## Camera Discovery Opsional
 
----
+Camera discovery masih dipertahankan sebagai tooling opsional. Django `/api/cameras` akan membaca `output/cameras.json` jika ada; jika belum ada, endpoint ini mencoba mengambil daftar kamera dari API CCTV dan menyimpannya ke file tersebut.
 
-## Troubleshooting
+```bash
+venv\Scripts\python.exe main.py --probe 50 --workers 10
+```
 
-1. **`401/403` saat akses playlist/segmen**
-   - Jalankan `POST /api/refresh-cookies`.
-   - Pastikan `cookies-exp.py` aktif di port `5001`.
-   - Cek `/api/debug-session` untuk memastikan cookie kunci tersedia.
+Output runtime akan masuk ke `output/cameras.json` dan tidak dilacak git.
 
-2. **Daftar kamera kosong**
-   - Jalankan `python main.py` atau `POST /api/scrape`.
-   - Cek koneksi ke API kamera target.
+## Legacy Flask Layer
 
-3. **Selenium gagal start**
-   - Cek instalasi Chrome/Chromium + ChromeDriver.
-   - Pastikan ChromeDriver bisa dipanggil dari PATH.
+`app.py` masih bisa dijalankan untuk kompatibilitas route lama:
 
-4. **Video tidak tampil tapi request jalan**
-   - Cek console browser dan response `/proxy/playlist`.
-   - Pastikan URL stream valid dan kamera memang aktif.
+```bash
+venv\Scripts\python.exe app.py
+```
 
----
+Namun player dan API utama proyek sekarang berjalan lewat Django di port 8000. Route Flask untuk `POST /api/refresh-cookies`, `GET /proxy/playlist`, dan `GET /proxy/segment` diberi header deprecation.
 
-## Catatan Keamanan dan Push ke Git
+## Materi Belajar
 
-Project ini menyimpan data sensitif runtime (khususnya cookie sesi) secara lokal. Jangan commit file berikut:
+Untuk memahami proyek dari dasar, baca `docs/MATERI_BELAJAR_PROYEK.md`. Dokumen itu menjelaskan HTTP, HLS, cookie, session, handshake, Django, Redis, Celery, Selenium, dan peta folder/source code proyek ini secara bertahap.
+## Menjalankan Test
+
+```bash
+venv\Scripts\python.exe manage.py check
+venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+Test tidak membutuhkan internet, Redis server nyata, atau browser nyata karena memakai mocked upstream, fake Redis, dan task Celery eager/apply.
+
+## Keamanan
+
+Jangan commit data runtime sensitif:
 
 - `cookies.json`
 - `output/cookies_cache.json`
-- isi folder `cache_segments/`
-- file env lokal (`.env*`, kecuali `.env.example`)
+- isi `cache_segments/`
+- `.env*`
 
-`.gitignore` sudah diperbarui agar aman untuk kebutuhan push harian.
+Dokumentasi dan test hanya boleh memakai nilai dummy seperti `base`, `token`, atau `task-id`, bukan cookie/token nyata.
 
----
 
-## Saran Pengembangan Lanjut
-
-- Pindahkan API key hardcoded ke environment variable.
-- Tambahkan unit test untuk fungsi rewrite playlist dan cookie/session fallback.
-- Tambahkan endpoint health khusus untuk cek konektivitas ke stream CDN.
-- Tambahkan strategi invalidasi cache segmen (TTL/max size) agar disk tidak terus membesar.
