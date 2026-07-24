@@ -171,9 +171,11 @@ class JuicyDecoder:
                         return sources.get('file')
             except Exception:
                 pass
-        m = re.search(r'file["\']?\s*:\s*["\'](.*?\.m3u8.*?)["\']', decoded_js)
+        m = re.search(r'file["\']?\s*:\s*["\'](.*?)["\']', decoded_js)
         if m:
-            return m.group(1).replace('\\/', '/')
+            val = m.group(1).replace('\\/', '/')
+            if 'stream/' in val:
+                return val
         return None
 
     @classmethod
