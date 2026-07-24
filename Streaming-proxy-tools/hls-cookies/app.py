@@ -1,27 +1,25 @@
-"""
-app.py — Flask HLS Proxy Server
+﻿"""
+app.py â€” Flask HLS Proxy Server
 
 Alur kerja:
-    1. /api/refresh-cookies  → Panggil cookies-exp.py Selenium service,
+    1. /api/refresh-cookies  -> Panggil Selenium refresher internal,
                                simpan cookie ke output/cookies_cache.json
-    2. /api/cameras          → Baca cameras.json, kembalikan daftar kamera
-    3. /proxy/playlist       → Fetch .m3u8 dari CDN dengan cookie, rewrite URL
+    2. /api/cameras          â†’ Baca cameras.json, kembalikan daftar kamera
+    3. /proxy/playlist       â†’ Fetch .m3u8 dari CDN dengan cookie, rewrite URL
                                segmen agar mengarah ke /proxy/segment lokal
-    4. /proxy/segment        → Fetch segmen .ts dari CDN dengan cookie,
+    4. /proxy/segment        â†’ Fetch segmen .ts dari CDN dengan cookie,
                                teruskan ke browser (mendukung Range header)
-    5. /player               → Halaman UI HLS.js
+    5. /player               â†’ Halaman UI HLS.js
 
 Bypass SOP (Same-Origin Policy):
     Browser tidak dapat mengirim Cookie cross-origin ke subdomain streaming.
     Proxy ini menyelesaikan masalah tersebut dengan menjadi perantara:
     - Browser hanya berbicara dengan proxy lokal (http://localhost:5000)
     - Proxy menyimpan cookie sesi dan menyertakannya pada setiap request
-      ke server CDN eksternal — transparan bagi browser.
+      ke server CDN eksternal â€” transparan bagi browser.
 """
 
-import hashlib
 import json
-import os
 import threading
 import urllib.parse
 from pathlib import Path
@@ -30,10 +28,41 @@ import requests as req
 from flask import Flask, Response, jsonify, render_template, request
 
 import config
+from core.camera_identity import (
+    CameraIdentity,
+    extract_camera_identity as core_extract_camera_identity,
+    normalize_camera_path as core_normalize_camera_path,
+)
+from core.cookie_store import JsonCookieStore
+from core.handshake import (
+    CAMERA_COOKIE_NAMES as CORE_CAMERA_COOKIE_NAMES,
+    BASE_COOKIE_NAMES as CORE_BASE_COOKIE_NAMES,
+    HandshakeManager,
+    camera_cookie_names as core_camera_cookie_names,
+    cookie_domain_matches as core_cookie_domain_matches,
+    cookie_path_matches as core_cookie_path_matches,
+    has_base_cookies as core_has_base_cookies,
+    has_camera_cookies as core_has_camera_cookies,
+)
+from core.hls_client import HlsProxyService
+from core.playlist_rewriter import (
+    make_absolute_url as core_make_absolute_url,
+    rewrite_playlist as core_rewrite_playlist,
+)
+from core.session_factory import build_session_from_snapshot
+from core.segment_cache import (
+    cache_path_for_url as core_cache_path_for_url,
+    detect_content_type as core_detect_content_type,
+    parse_range as core_parse_range,
+)
+from upstream_auth.selenium_refresher import (
+    BaseCookieTimeout,
+    CookieRefreshError,
+    InvalidRefreshTarget,
+    refresh_base_cookies,
+)
 from scraper import (
-    build_session,
     fetch_with_session,
-    load_cookies_from_file,
     logger,
     save_json,
 )
@@ -42,33 +71,75 @@ _CCTV_API_URL = "https://api-newseribuwajah.bandarlampungkota.go.id/cctvs"
 _CCTV_API_KEY = "ParkirIlegalDetectKey2026"
 
 app = Flask(__name__)
+_cookie_store = JsonCookieStore(config.COOKIES_CACHE_FILE, config.COOKIES_MANUAL_FILE)
+_handshake_manager = HandshakeManager(config.STREAM_REFERER, logger)
 
-# ── Session & Cookie State (in-memory, refreshed via /api/refresh-cookies) ────
+# â”€â”€ Session & Cookie State (in-memory, refreshed via /api/refresh-cookies) â”€â”€â”€â”€
 _session_lock = threading.Lock()
 _proxy_session: req.Session | None = None
 _loaded_cookies: list[dict] = []
 
-# ── Handshake cache (per kamera, per session) ─────────────────────────────────
-_handshaked_paths: set[str] = set()
-_handshake_lock = threading.Lock()
+# â”€â”€ Handshake cache (per kamera, per session) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+_handshaked_paths = _handshake_manager.handshaked_paths
+_handshake_lock = _handshake_manager._handshake_lock
+_handshake_locks = _handshake_manager._camera_locks
+_handshake_locks_lock = _handshake_manager._camera_locks_lock
+
+# Refresh cookie service state. Concurrent callers for the same target share the
+# in-flight refresh so only one Selenium driver is opened at a time.
+_refresh_condition = threading.Condition(threading.Lock())
+_refresh_in_progress = False
+_last_refresh_target: str | None = None
+_last_refresh_cookies: list[dict] | None = None
+_last_refresh_error: Exception | None = None
+
+_BASE_COOKIE_NAMES = CORE_BASE_COOKIE_NAMES
+_CAMERA_COOKIE_NAMES = CORE_CAMERA_COOKIE_NAMES
 
 
-def _refresh_cookies_from_service(target_url: str) -> list[dict]:
-    """Minta cookie service menavigasi target URL tertentu lalu kembalikan cookies."""
-    resp = req.post(
-        f"{config.COOKIE_SERVICE_URL}/scrape",
-        json={"url": target_url},
-        timeout=90,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    cookies = data.get("cookies", [])
+def _perform_cookie_refresh(target_url: str) -> list[dict]:
+    """Refresh base cookies through the internal Selenium refresher."""
+    cookies = refresh_base_cookies(target_url)
     if not cookies:
         raise ValueError(f"Tidak ada cookie yang diterima dari target {target_url}")
-    save_json({"url": target_url, "cookies": cookies}, config.COOKIES_CACHE_FILE)
+    _cookie_store.save_base_cookies(cookies)
     _rebuild_session(cookies)
     return cookies
 
+def _refresh_cookies_from_service(target_url: str) -> list[dict]:
+    """Refresh cookie dasar dengan satu proses Selenium aktif per target."""
+    global _refresh_in_progress, _last_refresh_target, _last_refresh_cookies, _last_refresh_error
+
+    with _refresh_condition:
+        if _refresh_in_progress:
+            while _refresh_in_progress:
+                _refresh_condition.wait()
+            if _last_refresh_target == target_url:
+                if _last_refresh_error is not None:
+                    raise _last_refresh_error
+                if _last_refresh_cookies is not None:
+                    return list(_last_refresh_cookies)
+
+        _refresh_in_progress = True
+
+    try:
+        cookies = _perform_cookie_refresh(target_url)
+    except Exception as exc:
+        with _refresh_condition:
+            _last_refresh_target = target_url
+            _last_refresh_cookies = None
+            _last_refresh_error = exc
+            _refresh_in_progress = False
+            _refresh_condition.notify_all()
+        raise
+
+    with _refresh_condition:
+        _last_refresh_target = target_url
+        _last_refresh_cookies = list(cookies)
+        _last_refresh_error = None
+        _refresh_in_progress = False
+        _refresh_condition.notify_all()
+    return cookies
 
 def _get_session() -> req.Session:
     """
@@ -76,20 +147,18 @@ def _get_session() -> req.Session:
 
     Urutan sumber cookie:
     1. In-memory session (sudah di-rebuild via /api/refresh-cookies)
-    2. output/cookies_cache.json  — dari Selenium service
-    3. cookies.json               — dari browser export manual
+    2. output/cookies_cache.json  - dari Selenium refresher internal
+    3. cookies.json               â€” dari browser export manual
     4. Session kosong (stream kemungkinan akan 403)
     """
     global _proxy_session
     with _session_lock:
         if _proxy_session is None:
-            cookies = load_cookies_from_file(config.COOKIES_CACHE_FILE)
-            if not cookies:
-                cookies = load_cookies_from_file(config.COOKIES_MANUAL_FILE)
-            _proxy_session = build_session(cookies)
+            cookies = _cookie_store.load_base_cookies()
+            _proxy_session = build_session_from_snapshot(cookies)
             logger.info(
                 f"Session dibuat dengan {len(cookies)} cookie "
-                f"({'cache' if cookies else 'kosong — kemungkinan 403 dari CDN'})"
+                f"({'cache' if cookies else 'kosong â€” kemungkinan 403 dari CDN'})"
             )
         return _proxy_session
 
@@ -99,33 +168,54 @@ def _rebuild_session(cookies: list[dict]) -> None:
     global _proxy_session, _loaded_cookies
     with _session_lock:
         _loaded_cookies = cookies
-        _proxy_session = build_session(cookies)
+        _proxy_session = build_session_from_snapshot(cookies)
     with _handshake_lock:
         _handshaked_paths.clear()
     logger.info(f"Session di-rebuild dengan {len(cookies)} cookie baru.")
 
 
-# ── Cache segmen .ts di disk ───────────────────────────────────────────────────
+# â”€â”€ Cache segmen .ts di disk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _CACHE_DIR = Path("cache_segments")
 _CACHE_DIR.mkdir(exist_ok=True)
 
 
 def _cache_path(url: str) -> Path:
-    url_hash = hashlib.md5(url.encode()).hexdigest()
-    return _CACHE_DIR / f"{url_hash}.dat"
+    return core_cache_path_for_url(url, _CACHE_DIR)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # API ROUTES
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+
+class _HandshakeAdapter:
+    def handshake_stream_session(self, session: req.Session, url: str) -> bool:
+        return _handshake_stream_session(session, url)
+
+    def invalidate_camera_session(self, session: req.Session, url: str) -> None:
+        _invalidate_camera_session(session, url)
+
+
+def _make_hls_service() -> HlsProxyService:
+    return HlsProxyService(
+        get_session=_get_session,
+        refresh_base_cookies=_refresh_cookies_from_service,
+        handshake_manager=_HandshakeAdapter(),
+        fetch_with_session=fetch_with_session,
+        cache_path_for_url=_cache_path,
+        referer=config.STREAM_REFERER,
+        timeout=config.TIMEOUT,
+        portal_url=config.PORTAL_URL,
+        logger=logger,
+        allowed_hosts=set(config.ALLOWED_COOKIE_REFRESH_HOSTS),
+    )
 @app.get("/")
 def index():
     return jsonify({
         "service": "HLS Cookie Proxy",
         "endpoints": {
             "GET  /player":                 "Dashboard pemutar HLS",
-            "POST /api/refresh-cookies":    "Refresh cookie dari Selenium service",
+            "POST /api/refresh-cookies":    "Refresh cookie dasar via Selenium internal",
             "GET  /api/cameras":            "Daftar kamera dari cameras.json",
             "POST /api/scrape":             "Paksa ulang scraping portal",
             "GET  /api/debug-session":      "Tampilkan cookie aktif di session",
@@ -144,28 +234,27 @@ def player():
 @app.post("/api/refresh-cookies")
 def refresh_cookies():
     """
-    Panggil cookies-exp.py Selenium service untuk mendapatkan cookie segar
+    Panggil Selenium refresher internal untuk mendapatkan cookie dasar segar
     dari portal utama, lalu simpan ke cache dan rebuild session.
     """
     try:
         target_url = (request.get_json(silent=True) or {}).get("url") or config.PORTAL_URL
         cookies = _refresh_cookies_from_service(target_url)
 
-        return jsonify({
+        return _deprecated_flask_response(jsonify({
             "status": "ok",
             "cookie_count": len(cookies),
             "cookies": [{"name": c.get("name"), "domain": c.get("domain")} for c in cookies],
-        })
+        }))
 
-    except req.ConnectionError:
-        return jsonify({
-            "status": "error",
-            "message": f"Tidak dapat terhubung ke Selenium service di {config.COOKIE_SERVICE_URL}. "
-                       f"Pastikan cookies-exp.py berjalan (port 5001).",
-        }), 503
+    except InvalidRefreshTarget as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except (BaseCookieTimeout, CookieRefreshError) as e:
+        logger.warning(f"refresh_cookies failed: {e}")
+        return jsonify({"status": "error", "message": "Refresh cookie dasar belum berhasil."}), 503
     except Exception as e:
         logger.error(f"refresh_cookies error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "Refresh cookie gagal."}), 500
 
 
 @app.get("/api/cameras")
@@ -240,13 +329,12 @@ def debug_session():
     cookies_in_session = [
         {
             "name":   c.name,
-            "value":  c.value[:40] + "…" if len(c.value) > 40 else c.value,
             "domain": c.domain,
             "path":   c.path,
         }
         for c in session.cookies
     ]
-    required = {"cctv_access", "stream_token", "hlsSession", "cookieCheck"}
+    required = _BASE_COOKIE_NAMES
     present  = {c["name"] for c in cookies_in_session}
     missing  = required - present
 
@@ -259,9 +347,8 @@ def debug_session():
         "status":       "ok" if not missing else "incomplete",
         "hint": (
             None if not missing else
-            f"Cookie yang kurang: {', '.join(missing)}. "
-            f"Export ulang cookies.json dari browser SETELAH membuka halaman player kamera, "
-            f"lalu panggil POST /api/inject-cookies."
+            f"Cookie dasar yang kurang: {', '.join(missing)}. "
+            f"Refresh cookie dasar lewat POST /api/refresh-cookies atau export ulang cookies.json."
         ),
     })
 
@@ -294,7 +381,7 @@ def inject_cookies():
 
         session.cookies.set(name, value, domain=domain, path=path)
         injected.append({"name": name, "domain": domain, "path": path})
-        logger.info(f"[INJECT] {name} → domain={domain} path={path}")
+        logger.info(f"[INJECT] {name} â†’ domain={domain} path={path}")
 
     with _handshake_lock:
         _handshaked_paths.clear()
@@ -302,117 +389,63 @@ def inject_cookies():
     return jsonify({"status": "ok", "injected": len(injected), "cookies": injected})
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # HLS PROXY ROUTES
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+def _extract_camera_identity(url: str) -> CameraIdentity | None:
+    return core_extract_camera_identity(url)
+
+
+def _normalize_camera_path(path: str) -> str | None:
+    return core_normalize_camera_path(path)
+
+
+def _cookie_domain_matches(hostname: str, cookie_domain: str) -> bool:
+    return core_cookie_domain_matches(hostname, cookie_domain)
+
+
+def _cookie_path_matches(camera_path: str, cookie_path: str) -> bool:
+    return core_cookie_path_matches(camera_path, cookie_path)
+
+
+def _has_base_cookies(session: req.Session) -> bool:
+    return core_has_base_cookies(session)
+
+
+def _camera_cookie_names(session: req.Session, identity: CameraIdentity) -> set[str]:
+    return core_camera_cookie_names(session, identity)
+
+
+def _has_camera_cookies(session: req.Session, identity: CameraIdentity) -> bool:
+    return core_has_camera_cookies(session, identity)
+
+
+def _get_camera_lock(camera_key: str) -> threading.Lock:
+    return _handshake_manager._get_camera_lock(camera_key)
+
+
+def _invalidate_camera_session(session: req.Session, url: str) -> None:
+    _handshake_manager.invalidate_camera_session(session, url)
+
 
 def _make_absolute_url(base_url: str, line: str) -> str:
-    if line.startswith("http://") or line.startswith("https://"):
-        return line
-    return urllib.parse.urljoin(base_url, line)
+    return core_make_absolute_url(base_url, line)
 
 
 def _rewrite_playlist(content: str, base_url: str) -> str:
-    """
-    Tulis ulang isi file .m3u8 agar setiap segmen dan sub-playlist
-    mengarah ke endpoint proxy lokal, bukan langsung ke CDN.
-    """
-    lines = content.splitlines()
-    rewritten: list[str] = []
-
-    for line in lines:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            rewritten.append(line)
-            continue
-
-        abs_url = _make_absolute_url(base_url, stripped)
-        encoded = urllib.parse.quote(abs_url, safe="")
-
-        if stripped.endswith(".m3u8"):
-            rewritten.append(f"/proxy/playlist?url={encoded}")
-        else:
-            rewritten.append(f"/proxy/segment?url={encoded}")
-
-    return "\n".join(rewritten) + "\n"
+    return core_rewrite_playlist(content, base_url)
 
 
-def _handshake_stream_session(session: req.Session, m3u8_url: str) -> None:
-    """
-    Lakukan handshake ke streaming server CDN untuk memperoleh cookie
-    `hlsSession` dan `cookieCheck` yang diperlukan sebelum mengakses .m3u8.
-    Hanya dilakukan sekali per kamera per session aktif.
-    """
-    parsed = urllib.parse.urlparse(m3u8_url)
-    path_parts = parsed.path.rstrip("/").split("/")
-
-    cam_segment = ""
-    for part in path_parts:
-        if part.startswith("cctv_"):
-            cam_segment = part
-            break
-
-    if not cam_segment:
-        return
-
-    base_path = f"/{cam_segment}/"
-    handshake_url = urllib.parse.urlunparse((parsed.scheme, parsed.netloc, base_path, "", "", ""))
-    handshake_key = f"{parsed.netloc}{base_path}"
-
-    with _handshake_lock:
-        if handshake_key in _handshaked_paths:
-            return
-
-    logger.info(f"[HANDSHAKE] Inisialisasi sesi untuk {cam_segment}…")
-    try:
-        resp = session.get(
-            handshake_url,
-            headers={
-                "Referer":        config.STREAM_REFERER,
-                "Origin":         config.STREAM_REFERER.rstrip("/"),
-                "Accept":         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Sec-Fetch-Site": "same-site",
-                "Sec-Fetch-Mode": "navigate",
-            },
-            timeout=10,
-            allow_redirects=True,
-        )
-
-        # Ambil hlsSession + cookieCheck yang baru di-set server,
-        # lalu duplikasi ke path "/" agar berlaku untuk SEMUA sub-path
-        # (server set cookie dengan path=/cctv_X, tapi requests hanya
-        # mengirimnya ke URL yang path-nya cocok — duplikasi ke "/" fix ini).
-        hls_val = None
-        check_val = None
-        for c in session.cookies:
-            if c.name == "hlsSession" and c.path == base_path:
-                hls_val = c.value
-            if c.name == "cookieCheck" and c.path == base_path:
-                check_val = c.value
-
-        if hls_val:
-            session.cookies.set("hlsSession", hls_val,
-                                domain=parsed.netloc, path="/")
-        if check_val:
-            session.cookies.set("cookieCheck", check_val,
-                                domain=parsed.netloc, path="/")
-
-        hls_session = hls_val or "(belum didapat)"
-        cookie_check = check_val or "(belum didapat)"
-
-        logger.info(
-            f"[HANDSHAKE] HTTP {resp.status_code} | "
-            f"hlsSession={hls_session[:8] if hls_val else hls_session}… | "
-            f"cookieCheck={cookie_check}"
-        )
-
-        with _handshake_lock:
-            _handshaked_paths.add(handshake_key)
-
-    except Exception as e:
-        logger.warning(f"[HANDSHAKE] Gagal (akan tetap mencoba fetch): {e}")
+def _handshake_stream_session(session: req.Session, m3u8_url: str) -> bool:
+    return _handshake_manager.handshake_stream_session(session, m3u8_url)
 
 
+def _deprecated_flask_response(response: Response) -> Response:
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "Django DRF endpoint is the primary API surface"
+    return response
 @app.route("/proxy/playlist", methods=["GET", "OPTIONS"])
 def proxy_playlist():
     if request.method == "OPTIONS":
@@ -423,63 +456,11 @@ def proxy_playlist():
         return Response("Missing 'url' parameter", status=400)
 
     try:
-        session = _get_session()
-        required = {"cctv_access", "stream_token", "hlsSession", "cookieCheck"}
-        present = {c.name for c in session.cookies}
-        if not required.issubset(present):
-            try:
-                _refresh_cookies_from_service(config.PORTAL_URL)
-                session = _get_session()
-            except Exception as refresh_error:
-                logger.warning(f"[REFRESH] Gagal refresh via service untuk portal: {refresh_error}")
-
-        _handshake_stream_session(session, m3u8_url)
-
-        resp = fetch_with_session(session, m3u8_url, referer=config.STREAM_REFERER, timeout=config.TIMEOUT)
-
-        if resp.status_code in (401, 403):
-            parsed = urllib.parse.urlparse(m3u8_url)
-            for part in parsed.path.rstrip("/").split("/"):
-                if part.startswith("cctv_"):
-                    key = f"{parsed.netloc}/{part}/"
-                    with _handshake_lock:
-                        _handshaked_paths.discard(key)
-                    break
-
-            try:
-                _refresh_cookies_from_service(config.PORTAL_URL)
-                session = _get_session()
-                _handshake_stream_session(session, m3u8_url)
-                resp = fetch_with_session(session, m3u8_url, referer=config.STREAM_REFERER, timeout=config.TIMEOUT)
-            except Exception as refresh_error:
-                logger.warning(f"[REFRESH] Retry refresh gagal untuk {m3u8_url}: {refresh_error}")
-
-            if resp.status_code in (401, 403):
-                return Response(
-                    f"{resp.status_code} dari CDN — Cookie stream belum terbentuk untuk URL ini. "
-                    f"Coba POST /api/refresh-cookies dengan url stream yang sama atau buka stream di browser asli lalu export cookies terbaru.",
-                    status=resp.status_code,
-                    headers={"Access-Control-Allow-Origin": "*"},
-                )
-
-        resp.raise_for_status()
-        rewritten = _rewrite_playlist(resp.text, m3u8_url)
-
-        return Response(
-            rewritten,
-            status=200,
-            headers={
-                "Content-Type":                    "application/vnd.apple.mpegurl",
-                "Cache-Control":                   "no-store, no-cache",
-                "Access-Control-Allow-Origin":     "*",
-                "Access-Control-Allow-Headers":    "Range, Content-Type",
-                "Access-Control-Expose-Headers":   "Content-Length, Content-Range",
-            },
-        )
+        payload = _make_hls_service().fetch_playlist(m3u8_url)
+        return _deprecated_flask_response(Response(payload.body, status=payload.status, headers=payload.headers))
     except Exception as e:
         logger.error(f"proxy_playlist error ({m3u8_url}): {e}")
         return Response(f"Proxy error: {e}", status=502)
-
 
 @app.route("/proxy/segment", methods=["GET", "OPTIONS"])
 def proxy_segment():
@@ -490,68 +471,12 @@ def proxy_segment():
     if not seg_url:
         return Response("Missing 'url' parameter", status=400)
 
-    cache_file = _cache_path(seg_url)
+    payload = _make_hls_service().fetch_segment(seg_url, request.headers.get("Range"))
+    return _deprecated_flask_response(Response(payload.body, status=payload.status, headers=payload.headers))
 
-    if cache_file.exists():
-        body = cache_file.read_bytes()
-        logger.debug(f"CACHE HIT: {seg_url.split('/')[-1]}")
-    else:
-        try:
-            session = _get_session()
-            resp = fetch_with_session(session, seg_url, referer=config.STREAM_REFERER, timeout=config.TIMEOUT)
-            if resp.status_code == 403:
-                return Response(b"", status=403, headers={"Access-Control-Allow-Origin": "*"})
-            resp.raise_for_status()
-            body = resp.content
-
-            tmp = str(cache_file) + ".tmp"
-            with open(tmp, "wb") as f:
-                f.write(body)
-            os.replace(tmp, cache_file)
-            logger.debug(f"CACHE MISS: {seg_url.split('/')[-1]} ({len(body)} bytes)")
-
-        except Exception as e:
-            logger.error(f"proxy_segment fetch error: {e}")
-            return Response(b"", status=502, headers={"Access-Control-Allow-Origin": "*"})
-
-    range_header = request.headers.get("Range")
-    body_len = len(body)
-    content_type = _detect_content_type(seg_url)
-
-    if range_header:
-        start, end = _parse_range(range_header, body_len)
-        sliced = body[start: end + 1]
-        return Response(
-            sliced,
-            status=206,
-            headers={
-                "Content-Type":                  content_type,
-                "Content-Length":                str(len(sliced)),
-                "Content-Range":                 f"bytes {start}-{end}/{body_len}",
-                "Accept-Ranges":                 "bytes",
-                "Cache-Control":                 "no-store",
-                "Access-Control-Allow-Origin":   "*",
-                "Access-Control-Expose-Headers": "Content-Length, Content-Range",
-            },
-        )
-
-    return Response(
-        body,
-        status=200,
-        headers={
-            "Content-Type":                  content_type,
-            "Content-Length":                str(body_len),
-            "Accept-Ranges":                 "bytes",
-            "Cache-Control":                 "no-store",
-            "Access-Control-Allow-Origin":   "*",
-            "Access-Control-Expose-Headers": "Content-Length, Content-Range",
-        },
-    )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _cors_preflight() -> Response:
     return Response(
@@ -566,25 +491,34 @@ def _cors_preflight() -> Response:
 
 
 def _parse_range(range_header: str, file_len: int) -> tuple[int, int]:
-    try:
-        parts = range_header.replace("bytes=", "").strip().split("-")
-        start = int(parts[0]) if parts[0] else 0
-        end   = int(parts[1]) if len(parts) > 1 and parts[1] else file_len - 1
-        return max(0, start), min(end, file_len - 1)
-    except Exception:
-        return 0, file_len - 1
+    return core_parse_range(range_header, file_len)
 
 
 def _detect_content_type(url: str) -> str:
-    clean = url.split("?")[0].lower()
-    if clean.endswith(".m4s") or clean.endswith(".mp4"):
-        return "video/mp4"
-    if clean.endswith(".aac") or clean.endswith(".m4a"):
-        return "audio/aac"
-    return "video/mp2t"
+    return core_detect_content_type(url)
 
 
 if __name__ == "__main__":
     logger.info(f"HLS Cookie Proxy berjalan di http://{config.PROXY_HOST}:{config.PROXY_PORT}")
-    logger.info(f"Pastikan cookies-exp.py berjalan di port 5001")
     app.run(host=config.PROXY_HOST, port=config.PROXY_PORT, debug=True, threaded=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
