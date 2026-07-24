@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CCTV Dashboard — Polresta Bandar Lampung</title>
+<title>CCTV Dashboard â€” Polresta Bandar Lampung</title>
 <style>
   :root {
     --bg: #0a0d0a;
@@ -30,7 +30,7 @@
     overflow: hidden;
   }
 
-  /* ── HEADER ── */
+  /* â”€â”€ HEADER â”€â”€ */
   header {
     flex-shrink: 0;
     padding: 14px 20px;
@@ -49,10 +49,10 @@
   }
   #totalCount, #activeCount { color: var(--accent); }
 
-  /* ── LAYOUT ── */
+  /* â”€â”€ LAYOUT â”€â”€ */
   .layout { flex: 1; display: flex; min-height: 0; }
 
-  /* ── SIDEBAR ── */
+  /* â”€â”€ SIDEBAR â”€â”€ */
   .sidebar {
     width: 280px; flex-shrink: 0;
     border-right: 1px solid var(--line);
@@ -83,7 +83,7 @@
   .cam-dot.offline { background: #444; }
   .cam-name { font-size: 11px; line-height: 1.4; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* ── MAIN PANEL ── */
+  /* â”€â”€ MAIN PANEL â”€â”€ */
   .main-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
 
   .cam-title-bar {
@@ -139,18 +139,18 @@
 <header>
   <h1>CCTV Monitor <span>// seribuwajah.bandarlampungkota</span></h1>
   <div class="header-meta">
-    <span>Total: <span id="totalCount">—</span></span>
-    <span>Aktif: <span id="activeCount">—</span></span>
+    <span>Total: <span id="totalCount">â€”</span></span>
+    <span>Aktif: <span id="activeCount">â€”</span></span>
   </div>
 </header>
 
 <div class="layout">
   <aside class="sidebar">
     <div class="sidebar-search">
-      <input type="text" id="searchInput" placeholder="Cari nama kamera…" autocomplete="off">
+      <input type="text" id="searchInput" placeholder="Cari nama kameraâ€¦" autocomplete="off">
     </div>
     <div class="camera-list" id="cameraList">
-      <div style="padding:16px 14px;font-size:11px;color:var(--text-dim)">Memuat daftar kamera…</div>
+      <div style="padding:16px 14px;font-size:11px;color:var(--text-dim)">Memuat daftar kameraâ€¦</div>
     </div>
   </aside>
 
@@ -171,9 +171,9 @@
 
     <div class="stats-bar">
       <div class="stat-item">Status<b id="statStatus">Idle</b></div>
-      <div class="stat-item">Level<b id="statLevel">—</b></div>
-      <div class="stat-item">Bitrate<b id="statBitrate">—</b></div>
-      <div class="stat-item">Resolusi<b id="statRes">—</b></div>
+      <div class="stat-item">Level<b id="statLevel">â€”</b></div>
+      <div class="stat-item">Bitrate<b id="statBitrate">â€”</b></div>
+      <div class="stat-item">Resolusi<b id="statRes">â€”</b></div>
     </div>
 
     <div class="log-wrap" id="logWrap"></div>
@@ -206,7 +206,7 @@
     activeCount:    document.getElementById('activeCount'),
   };
 
-  // ── Logging ──
+  // â”€â”€ Logging â”€â”€
   function log(msg, level = 'info') {
     const row = document.createElement('div');
     row.className = 'log-row';
@@ -221,9 +221,9 @@
     els.statStatus.className = cls;
   }
 
-  // ── Camera list ──
+  // â”€â”€ Camera list â”€â”€
   async function loadCameras() {
-    log('Memuat daftar kamera…', 'info');
+    log('Memuat daftar kameraâ€¦', 'info');
     try {
       const res = await fetch('/api/cameras');
       const data = await res.json();
@@ -233,7 +233,7 @@
       renderList(allCameras);
       log(`${allCameras.length} kamera dimuat.`, 'ok');
     } catch (e) {
-      els.cameraList.innerHTML = '<div style="padding:16px 14px;font-size:11px;color:var(--error)">Gagal memuat kamera. Pastikan app.py berjalan.</div>';
+      els.cameraList.innerHTML = '<div style="padding:16px 14px;font-size:11px;color:var(--error)">Gagal memuat kamera. Pastikan server Django berjalan dan daftar kamera tersedia.</div>';
       log('Gagal memuat daftar kamera: ' + e.message, 'error');
     }
   }
@@ -261,7 +261,7 @@
     renderList(q ? allCameras.filter(c => c.name.toLowerCase().includes(q)) : allCameras);
   });
 
-  // ── Select & play ──
+  // â”€â”€ Select & play â”€â”€
   function selectCamera(cam) {
     if (currentCam && currentCam.id === cam.id) return;
     stopStream();
@@ -280,7 +280,7 @@
     if (!cam.is_active || !cam.proxy_url) {
       els.offlineOverlay.classList.add('visible');
       setStatus('Tidak Aktif', 'error');
-      log(`${cam.name} — stream tidak aktif.`, 'warn');
+      log(`${cam.name} â€” stream tidak aktif.`, 'warn');
       return;
     }
 
@@ -288,7 +288,7 @@
     startHls(cam.proxy_url, cam.name);
   }
 
-  // ── HLS.js player ──
+  // â”€â”€ HLS.js player â”€â”€
   function startHls(proxyUrl, name) {
     if (!Hls.isSupported()) {
       // Fallback: browser native HLS (Safari)
@@ -307,7 +307,7 @@
     }
 
     hls = new Hls({
-      // Tidak pakai xhrSetup credentials — proxy lokal yang handle cookie
+      // Tidak pakai xhrSetup credentials â€” proxy lokal yang handle cookie
       enableWorker: true,
       lowLatencyMode: true,
       backBufferLength: 30,
@@ -321,7 +321,7 @@
     hls.attachMedia(els.video);
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-      log(`Manifest parsed — ${data.levels.length} level.`, 'ok');
+      log(`Manifest parsed â€” ${data.levels.length} level.`, 'ok');
       els.video.classList.add('visible');
       els.video.play().catch(() => {});
       setStatus('Live', 'ok');
@@ -333,7 +333,7 @@
       if (lvl) {
         els.statLevel.textContent = `L${data.level}`;
         els.statBitrate.textContent = Math.round(lvl.bitrate / 1000) + ' kbps';
-        els.statRes.textContent = lvl.width ? `${lvl.width}×${lvl.height}` : '—';
+        els.statRes.textContent = lvl.width ? `${lvl.width}Ã—${lvl.height}` : 'â€”';
       }
     });
 
@@ -343,10 +343,10 @@
         setStatus('Error', 'error');
         els.liveBadge.classList.remove('visible');
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          log('Network error — mencoba recovery…', 'warn');
+          log('Network error â€” mencoba recoveryâ€¦', 'warn');
           hls.startLoad();
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          log('Media error — mencoba recoverMedia…', 'warn');
+          log('Media error â€” mencoba recoverMediaâ€¦', 'warn');
           hls.recoverMediaError();
         } else {
           stopStream();
@@ -363,13 +363,13 @@
     els.video.classList.remove('visible');
     els.liveBadge.classList.remove('visible');
     els.offlineOverlay.classList.remove('visible');
-    els.statLevel.textContent = '—';
-    els.statBitrate.textContent = '—';
-    els.statRes.textContent = '—';
+    els.statLevel.textContent = 'â€”';
+    els.statBitrate.textContent = 'â€”';
+    els.statRes.textContent = 'â€”';
     setStatus('Idle');
   }
 
-  // ── Init ──
+  // â”€â”€ Init â”€â”€
   log('Dashboard siap.', 'info');
   loadCameras();
 
@@ -377,3 +377,4 @@
 </script>
 </body>
 </html>
+
