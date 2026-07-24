@@ -1,4 +1,4 @@
-"""
+﻿"""
 General utilities: HTTP fetching, cookie loading, JSON persistence, logging.
 """
 
@@ -42,7 +42,7 @@ def download_html(url: str, timeout: int = 10, retries: int = 3) -> str:
         response = requests.get(url, headers=headers, timeout=timeout)
         if response.status_code == 429:
             wait = 5 * (attempt + 1)
-            logger.warning(f"429 Too Many Requests — menunggu {wait}s sebelum retry... ({url})")
+            logger.warning(f"429 Too Many Requests â€” menunggu {wait}s sebelum retry... ({url})")
             time.sleep(wait)
             continue
         response.raise_for_status()
@@ -114,12 +114,14 @@ def fetch_with_session(
     url: str,
     referer: str = "",
     timeout: int = 10,
+    allow_redirects: bool = True,
+    extra_headers: dict[str, str] | None = None,
 ) -> requests.Response:
     """GET dengan session + referer header."""
-    headers = {}
+    headers = dict(extra_headers or {})
     if referer:
         headers["Referer"] = referer
-    return session.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+    return session.get(url, headers=headers, timeout=timeout, allow_redirects=allow_redirects)
 
 
 def save_json(data: dict, output_path: str) -> None:
@@ -129,3 +131,5 @@ def save_json(data: dict, output_path: str) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
     logger.info(f"Tersimpan ke {path}")
+
+
