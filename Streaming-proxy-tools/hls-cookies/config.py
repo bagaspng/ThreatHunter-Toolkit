@@ -1,5 +1,5 @@
-"""
-Project configuration — constants only, no logic.
+﻿"""
+Project configuration â€” constants only, no logic.
 """
 
 # Portal utama yang berisi daftar kamera
@@ -13,12 +13,21 @@ CAMERAS_OUTPUT_FILE = "output/cameras.json"
 COOKIES_CACHE_FILE  = "output/cookies_cache.json"
 COOKIES_MANUAL_FILE = "cookies.json"
 
-# Selenium cookie service (cookies-exp.py)
-COOKIE_SERVICE_URL = "http://localhost:5001"
-
+# Hostname yang boleh dipakai sebagai target refresh Selenium internal
+ALLOWED_COOKIE_REFRESH_HOSTS = (
+    "seribuwajah.bandarlampungkota.go.id",
+    "stream-newseribuwajah.bandarlampungkota.go.id",
+)
 # Proxy server
 PROXY_HOST = "0.0.0.0"
 PROXY_PORT = 5000
 
 # HTTP timeout (detik)
 TIMEOUT = 10
+
+
+
+# Segment cache policy
+SEGMENT_CACHE_TTL_SECONDS = 300
+SEGMENT_CACHE_MAX_FILES = 500
+
