@@ -53,7 +53,6 @@ Route Flask legacy untuk endpoint proxy yang sama diberi header `Deprecation: tr
 ├── config.py                # Konstanta upstream dan default runtime
 ├── requirements.txt         # Python dependencies
 ├── README.md                # Dokumentasi operasional
-└── AGENT.md                 # Konteks teknis untuk agent/developer
 ```
 
 Folder/file runtime yang sengaja tidak dilacak git:
