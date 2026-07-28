@@ -1,0 +1,9 @@
+validation:
+  timeout_sec: 6
+  concurrency: 150
+
+pool:
+  refresh_hours: 2
+
+rotation:
+  max_retries: 5
