@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proxyforge"
+version = "0.1.0"
+description = "Automated Proxy Validation & Rotation Engine"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.9.0",
+    "requests>=2.31.0",
+    "PyYAML>=6.0.1",
+]
+
+[project.scripts]
+proxyforge = "proxyforge.cli.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.5",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+    "types-requests",
+    "types-PyYAML",
+]
+scrapy = ["scrapy>=2.11.0"]
+httpx = ["httpx>=0.27.0"]
+playwright = ["playwright>=1.44"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 88
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
