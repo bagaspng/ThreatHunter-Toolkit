@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and outputs
+report.json
+working_proxies.json
+*.log
+
+# Distribution
+build/
+dist/
+*.egg-info/
