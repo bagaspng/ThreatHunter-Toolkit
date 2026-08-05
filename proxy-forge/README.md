@@ -1,167 +1,157 @@
 # 🛡️ ProxyForge
 
-**Automated Proxy Validation & Rotation Engine**
+**Automated Proxy Validation, Sticky Rotation Engine & Hybrid Form Automation Engine**
 
-ProxyForge adalah sistem (*pipeline*) berbasis Python yang dirancang untuk secara otomatis mengambil, memvalidasi, menyimpan, dan merotasi *public proxies*. Alat ini sangat berguna untuk keperluan pengambilan data atau integrasi sistem agar identitas IP asli dapat dikelola dan dilindungi secara mandiri melalui *round-robin routing*.
+ProxyForge adalah sistem (_pipeline_) berbasis Python yang dirancang untuk mengambil, memvalidasi, menyimpan, dan merotasi _public proxies_ secara otomatis. Sistem ini dilengkapi dengan modul pengujian automasi _Form & Native Captcha Solver_ hibrida (**curl_cffi**, **selectolax**, **Playwright**) yang mendukung rotasi IP dinamis _Sticky-Session Exhaustion_ secara _fault-tolerant_.
 
 ---
 
 ## ✨ Fitur Utama
-- **Multi-Source Aggregation**: Mengambil proxy dari berbagai sumber publik sekaligus (agregasi hingga 9000+ proxy mentah).
-- **Concurrent Validation**: Menguji ratusan proksi secara bersamaan (paralel) dengan kecepatan tinggi menggunakan `asyncio` & `aiohttp`.
-- **Auto-Rotation & Lazy Eviction**: Otomatis mengganti proksi yang mati atau mengalami *timeout* di tengah jalan tanpa membuat aplikasi mengalami *crash* (Fault-tolerant).
-- **Daemon Mode**: Bisa dijalankan di *background* untuk otomatis memperbarui (*auto-refresh*) daftar proxy aktif setiap beberapa jam.
-- **Framework Agnostic**: Menggunakan satu memori file ringan (`.json`) yang siap dibaca oleh *requests*, *httpx*, maupun *Scrapy*.
+
+- **Multi-Source Aggregation**: Agregasi proxy publik dari 8 sumber terpercaya sekaligus (hingga 9000+ proxy mentah).
+- **High-Concurrency Validation**: Menguji ratusan proksi secara bersamaan (paralel) menggunakan `asyncio` & `aiohttp`.
+- **Sticky-Session Exhaustion**: Mengunci 1 IP proxy hingga terbukti terbakar (_burned_) oleh target, lalu otomatis di-evict dan digantikan oleh proxy baru tanpa kehilangan progres siklus.
+- **Hybrid Automation Engine (Probe + Playwright)**:
+  - **Phase 1 Lightweight Probe (`curl_cffi` + `selectolax`)**: Deteksi cepat SPA Score & Honeypot tanpa muka peramban.
+  - **Phase 2 SPA Submitter (`Playwright Async`)**: Membuka peramban headless dengan pemblokiran gambar, CSS, font, & domain _tracker_ untuk menghemat RAM dan kuota.
+- **In-Memory PageProfile Caching & Fast Ping**: Menghindari ekstraksi HTML berulang dengan _caching_ profil halaman dan pengujian koneksi proxy kilat ($\approx 0.5$ detik).
+- **Clear 5-Step Progress Output**: Indikator progres CLI 5-tahap transparan (`[1/5]` s/d `[5/5]`) yang memudahkan identifikasi titik kegagalan proxy.
+- **Flat Module Layout**: Modul `automation/` disusun rapi tanpa _subfolder_ berlapis.
 
 ---
 
 ## 🏗️ Arsitektur Sistem
 
 ```text
-[Sumber Eksternal] (Beragam GitHub List / API)
+[Sumber Eksternal] (8 Sumber API & Public Proxy List)
        │ (M1: Fetch & Deduplicate)
        ▼
  ┌─────────────────────────┐
- │     ProxyValidator      │ 
+ │     ProxyValidator      │
  │  (M2: Async Ping &      │
  │       Filter Anonymity) │
  └─────────────────────────┘
        │
        ▼
  ┌─────────────────────────┐
- │       ProxyPool         │ (M3: Perankingan Skor & 
+ │       ProxyPool         │ (M3: Perankingan Skor &
  │  (working_proxies.json) │      Save ke Disk Lokal)
- └─────────────────────────┘
-       │
-       ▼
- ┌─────────────────────────┐
- │      ProxyRotator       │ (M4 & M5: Rotasi 
- │  (Round-Robin + Evict)  │      Round-Robin & Retry)
  └─────────────┬───────────┘
                │
-    ┌──────────┼──────────┐
-    ▼          ▼          ▼
- Terminal   Scrapy      HTTPX /
-   CLI     Middleware   Requests
+    ┌──────────┴────────────────────────────────┐
+    ▼                                           ▼
+ ┌─────────────────────────┐     ┌─────────────────────────────┐
+ │      ProxyRotator       │     │     automation/ Module      │
+ │(Sticky-Session Exhaust) │     │ (Probe -> Route -> Submit)  │
+ └─────────────┬───────────┘     └──────────────┬──────────────┘
+               │                                │
+    ┌──────────┼──────────┐                     │
+    ▼          ▼          ▼                     ▼
+ Terminal   Scrapy      HTTPX /           Form Automation &
+   CLI     Middleware   Requests         Captcha Solver Test
 ```
 
 ---
 
-## 🚀 Instalasi
+## 🚀 Instalasi & Persiapan
 
 1. **Clone repository ini**:
+
    ```bash
    git clone https://github.com/yourname/proxyforge.git
-   cd proxyforge
+   cd proxy-forge-implement
    ```
 
 2. **Gunakan Virtual Environment (Sangat Direkomendasikan)**:
+
    ```bash
    python -m venv venv
-   
-   # Untuk Windows:
+
+   # Untuk Windows (PowerShell):
    .\venv\Scripts\activate
-   
+
    # Untuk Linux/Mac:
    source venv/bin/activate
    ```
 
-3. **Install Dependencies**:
+3. **Install Dependencies & Browser Engine**:
    ```bash
    pip install -r requirements.txt
+   pip install curl_cffi selectolax playwright
+   playwright install chromium
    ```
 
 ---
 
-## 💻 Panduan Penggunaan (Terminal / CLI)
+## 💻 Panduan Perintah CLI (`main.py`)
 
-Semua perintah utama diakses melalui *entry-point* `main.py`.
+Seluruh perintah dapat diakses secara terpusat melalui file `main.py`.
 
-### 1. Mencari & Memvalidasi Proxy (`validate`)
-Perintah ini akan menyedot list proksi terbaru, mengetesnya secara simultan, dan menyimpan IP yang benar-benar **hidup** (beserta informasi statistik latency dan lokasinya) ke dalam file `working_proxies.json`.
+### 1. Validasi & Kumpulkan Proxy (`validate`)
+
+Mengambil list proksi terbaru dari internet, mengetesnya secara simultan, dan menyimpan IP yang **hidup** ke file `working_proxies.json`.
 
 ```bash
-# Contoh pemakaian agresif:
+# Validasi paralel (200 konkurrensi):
 python main.py validate --concurrency 200 --timeout 6 --anonymity elite anonymous unknown
-```
 
-**Mode Otomatis (Daemon)**
-Bila Anda ingin skrip berjalan diam-diam tanpa henti untuk memperbarui proksi setiap 1 jam (3600 detik):
-```bash
-python main.py validate --daemon --interval 3600
+# Mode Daemon (Auto-refresh di background setiap 30 menit):
+python main.py validate --daemon --interval 1800
 ```
-
-| Parameter | Default | Keterangan |
-| --- | --- | --- |
-| `--concurrency` | `100` | Jumlah IP maksimal yang di-*ping* secara paralel dalam 1 waktu. |
-| `--timeout` | `8` | Batas toleransi waktu tunggu (detik) untuk koneksi *ping*. |
-| `--anonymity` | `elite anonymous unknown` | Memfilter tingkat anonimitas. Secara *default* membuang proxy `transparent`. |
-| `--daemon` | `False` | Menjalankan program secara rekursif (berulang-ulang) layaknya server *background*. |
-| `--interval` | `1800` | Waktu jeda untuk eksekusi ulang daemon (dalam detik). |
 
 ---
 
-### 2. Menggunakan Proxy ke Target URL (`fetch`)
-Menggunakan proxy yang sudah dikumpulkan tadi untuk mengakses sebuah *website* tujuan secara bergilir.
+### 2. Mengakses URL Target (`fetch`)
+
+Mengirimkan HTTP request ke target menggunakan strategi rotasi _Sticky-Session Exhaustion_.
 
 ```bash
 python main.py fetch "https://httpbin.org/ip" --count 5
 ```
 
-| Parameter | Default | Keterangan |
-| --- | --- | --- |
-| `--count` | `1` | Berapa jumlah siklus permintaan (request) yang akan ditembakkan. Menggunakan proksi yang berbeda-beda. |
-| `--retries` | `3` | Apabila proxy putus/mati saat digunakan, sistem akan langsung menendang IP tersebut dan mencari IP pengganti hingga maksimal N retries. |
-| `--timeout` | `10` | Batas waktu respon dari web target. |
-
 ---
 
-### 3. Memantau Ketersediaan Proxy (`info`)
-Melihat ringkasan data, jumlah ketersediaan, kecepatan ping (*latency*), dan distribusi negara (*country distribution*) dari pool saat ini:
+### 3. Informasi Pool Proxy (`info`)
+
+Melihat statistik ketersediaan proxy, persentil _latency_, dan distribusi negara saat ini:
+
 ```bash
 python main.py info
 ```
 
 ---
 
-## 🧩 Integrasi ke dalam Kode Python Anda
+### 4. Uji Automasi Form & Captcha (`test-captcha`)
 
-Anda dapat menyisipkan `ProxyRotator` ini langsung ke dalam baris kode skrip Python Anda sehari-hari (*bot*, *crawler*, dll).
+Menjalankan pengujian automasi _Form & Native Captcha Solver_ hibrida dengan indikator progres 5-tahap.
 
-### A. Integrasi Paling Dasar (Otomatis Retry)
-```python
-from proxyforge.core.pool import ProxyPool
-from proxyforge.core.rotator import ProxyRotator
+```bash
+# Menjalankan 5 siklus pengujian (5 IP berbeda):
+python main.py test-captcha --iterations 5
 
-# 1. Muat database proksi aktif dari file fisik
-pool = ProxyPool.load("working_proxies.json")
-
-# 2. Inisialisasi Rotator dengan batas toleransi kegagalan = 3x
-rotator = ProxyRotator(pool, max_retries=3)
-
-# 3. Kirim permintaan (Request). 
-# Sistem akan mengurus masalah koneksi putus atau pergantian proxy secara otomatis.
-target_url = "https://api.ipify.org?format=json"
-response = rotator.fetch(target_url, timeout=10)
-
-if response:
-    print("Berhasil Terkoneksi menggunakan IP Masking:")
-    print(response.json())
-```
-
-### B. Menggunakan Scrapy Middleware (Opsional)
-Bila *pipeline* ini berada di dalam *project* Scrapy, konfigurasikan *Middleware*-nya pada `settings.py`:
-```python
-DOWNLOADER_MIDDLEWARES = {
-    "proxyforge.adapters.scrapy_middleware.ProxyForgeMiddleware": 750,
-}
-PROXYFORGE_POOL_PATH = "working_proxies.json"
+# Pengujian ke URL target kustom:
+python main.py test-captcha --iterations 3 --url "https://example.com"
 ```
 
 ---
 
-## 📝 Catatan Tambahan
+## 📂 Struktur Folder Proyek (Flat Layout)
 
-- **Daya Tahan Proxy Publik**: Proxy gratisan sering mati secara mendadak atau *down* dalam hitungan menit. Sangat disarankan untuk rutin memperbarui database (melalui fitur `--daemon`) untuk menjaga ketersediaan amunisi.
-- **Log Pelaporan**: Setiap kali perintah `validate` selesai berjalan, selain `working_proxies.json`, ia juga merangkum metrik performanya di dalam file `report.json`.
-- **Edukasi & Riset**: Alat ini diciptakan khusus untuk riset rekayasa perangkat lunak dan studi akademis terkait jaringan terdistribusi dan reliabilitas koneksi.
+```text
+proxy-forge-implement/
+├── main.py                    # Entrypoint CLI Utama (validate, fetch, info, test-captcha)
+├── working_proxies.json       # Cache Database Proxy Aktif
+├── report.json                # Laporan Ringkasan Performa Validasi
+├── automation/                # Modul Automasi Form & Captcha (FLAT Layout)
+│   ├── automation.py          # Phase 3: Pure Async Orchestrator & Fault-Tolerance Loop
+│   ├── probe.py               # Phase 1: Lightweight Probe (curl_cffi + selectolax) + PageProfile Cache
+│   ├── router.py              # Phase 2: Route Dispatcher (Static vs SPA)
+│   ├── static.py              # Static Submitter Handler (curl_cffi POST)
+│   ├── spa.py                 # SPA Submitter Handler (Playwright Async + Resource Blocking)
+│   ├── solver.py              # Captcha Regex Solver
+│   ├── contracts.py           # Data Contracts (PageProfile, SubmissionResult) & Exceptions
+│   ├── config.py              # Konfigurasi Selektor & Target URL
+│   └── README.md              # Dokumentasi Spesifik Modul Automasi
+└── src/
+    └── proxyforge/            # Core Library (ProxyPool, ProxyValidator, ProxyRotator)
+```
