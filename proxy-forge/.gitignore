@@ -1,25 +1,38 @@
-# Python
+# Python Cache & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
 
 # Virtual Environment
 venv/
+.venv/
 env/
 ENV/
 
-# Pytest
+# Testing & Coverage
 .pytest_cache/
 .coverage
 htmlcov/
+.coverage.*
 
-# Logs and outputs
-report.json
+# ProxyForge Generated Data & Cache
 working_proxies.json
+report.json
 *.log
+*.png
 
-# Distribution
+# Distribution & Package Metadata
 build/
 dist/
 *.egg-info/
+.eggs/
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
