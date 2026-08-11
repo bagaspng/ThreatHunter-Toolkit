@@ -82,18 +82,30 @@ def cmd_fetch(args: argparse.Namespace) -> None:
         sys.exit(1)
         
     rotator = ProxyRotator(pool, max_retries=args.retries)
-    print(f"\n[>] Mengakses URL: {args.url} menggunakan rotator ({args.count} kali bergiliran)...")
+    print(f"\n[>] Mengakses URL: {args.url} dengan strategi Sticky-Session Exhaustion ({args.count} total request)...")
     
-    for i in range(1, args.count + 1):
-        print(f"\n--- [ Request ke-{i} dari {args.count} ] ---")
+    request_num = 1
+    while request_num <= args.count:
+        if rotator.pool_size == 0:
+            print("\n[x] Error: Seluruh proxy dalam pool telah terbakar / dievakuasi (pool kosong).")
+            break
+
+        current_ip = rotator.current_proxy_uri
+        print(f"\n--- [ Request ke-{request_num} dari {args.count} | Proxy: {current_ip} ] ---")
+        
         response = rotator.fetch(args.url, timeout=args.timeout)
         
         if response:
             print(f"[+] Sukses! (Status Code: {response.status_code})")
             snippet = response.text[:200].replace('\n', ' ')
             print(f"    Snippet: {snippet}{' ...[truncated]' if len(response.text) > 200 else ''}")
+            request_num += 1
         else:
-            print("[x] Error: Fetch gagal karena seluruh IP pengganti mati/timeout.")
+            print(f"[!] Warning: Proxy {current_ip} terbakar/gagal. Beralih ke proxy berikutnya di pool...")
+            if rotator.pool_size == 0:
+                print("[x] Error: Seluruh IP pengganti mati/timeout/terblokir.")
+                break
+                
     print("\n[i] Seluruh siklus request selesai.\n")
 
 def cmd_info(args: argparse.Namespace) -> None:
@@ -105,6 +117,15 @@ def cmd_info(args: argparse.Namespace) -> None:
         print("")
     except FileNotFoundError:
         print("\n[x] Error: File working_proxies.json tidak ditemukan. Belum ada proxy yang divalidasi.\n")
+
+def cmd_test_captcha(args: argparse.Namespace) -> None:
+    try:
+        from automation.automation import run_automation
+    except ImportError as e:
+        print(f"\n[x] Error: Gagal memuat modul automation: {e}\n")
+        sys.exit(1)
+    
+    run_automation(iterations=args.iterations, url=args.url)
 
 def main() -> int:
     setup_logger()
@@ -125,6 +146,10 @@ def main() -> int:
     p_fetch.add_argument("--timeout", type=int, default=10, help="Waktu tunggu (detik) akses ke web target. Default: 10")
     
     p_info = subparsers.add_parser("info", help="Lihat statistik dan informasi negara dari pool proxy saat ini")
+
+    p_test = subparsers.add_parser("test-captcha", help="Uji automasi headless captcha dengan rotasi proxy dinamis")
+    p_test.add_argument("--iterations", type=int, default=3, help="Jumlah maksimal proxy / iterasi pengujian (default: 3)")
+    p_test.add_argument("--url", type=str, default=None, help="URL target alternatif jika ingin mengganti URL default config")
     
     args = parser.parse_args()
     
@@ -134,6 +159,8 @@ def main() -> int:
         cmd_fetch(args)
     elif args.command == "info":
         cmd_info(args)
+    elif args.command == "test-captcha":
+        cmd_test_captcha(args)
         
     return 0
 
