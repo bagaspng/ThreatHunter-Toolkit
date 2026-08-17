@@ -1,0 +1,9 @@
+requests>=2.31.0
+urllib3>=2.0.0
+beautifulsoup4>=4.12.0
+git+https://github.com/chorsley/python-Wappalyzer.git
+setuptools<81
+dnspython>=2.6.0
+fake-useragent>=1.5.0
+cryptography>=42.0.0
+rich>=13.7.0

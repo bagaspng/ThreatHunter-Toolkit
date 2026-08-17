@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from Wappalyzer import Wappalyzer, WebPage
 from flaresolverr_client import fetch_via_flaresolverr, fetch_via_flaresolverr_with_retry, create_flaresolverr_session, destroy_flaresolverr_session
+import cli_ui
 HAS_NMAP = shutil.which('nmap') is not None
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 USER_AGENTS_FALLBACK = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15']
@@ -31,7 +32,7 @@ try:
 except Exception as e:
     _UA_GENERATOR = None
     HAS_FAKE_USERAGENT = False
-    print(f'[i] fake-useragent tidak tersedia ({e}), pakai UA fallback manual.')
+    cli_ui.pretty_print(f'[i] fake-useragent tidak tersedia ({e}), pakai UA fallback manual.')
 
 def random_headers():
     if HAS_FAKE_USERAGENT:
@@ -49,14 +50,14 @@ try:
     WAPPALYZER = Wappalyzer.latest(update=True)
     HAS_WAPPALYZER = True
 except Exception as e:
-    print(f'[i] Gagal update database Wappalyzer ({e}), pakai database bawaan package.')
+    cli_ui.pretty_print(f'[i] Gagal update database Wappalyzer ({e}), pakai database bawaan package.')
     try:
         WAPPALYZER = Wappalyzer.latest(update=False)
         HAS_WAPPALYZER = True
     except Exception as e2:
         WAPPALYZER = None
         HAS_WAPPALYZER = False
-        print(f'[!] Gagal load Wappalyzer sama sekali: {e2}')
+        cli_ui.pretty_print(f'[!] Gagal load Wappalyzer sama sekali: {e2}')
 
 def is_cloudflare_challenge(resp_or_html):
     if resp_or_html is None:
@@ -166,7 +167,7 @@ def get_ip_whois(ip, log_fn):
         resp.raise_for_status()
         data = resp.json()
         if not data.get('success', True):
-            log_fn(f'  [!] ipwho.is gagal untuk {ip}: {data.get('message')}')
+            log_fn(f'  [!] ipwho.is gagal untuk {ip}: {data.get("message")}')
         return data
     except Exception as e:
         log_fn(f'  [!] Gagal ambil data ipwho.is untuk {ip}: {e}')
@@ -518,7 +519,8 @@ def recon_single_target(base_url, log_fn):
         else:
             log_fn(f'  [!] Gagal mengakses {base_url} -> {err}')
             log_fn('  [*] Mencoba bypass via FlareSolverr, siapa tahu diblokir Cloudflare...')
-        bypass_html, bypass_headers, bypass_err = fetch_with_cloudflare_bypass(base_url, log_fn, session_id=fs_session_id)
+        with cli_ui.spinner(f'Mencoba bypass Cloudflare via FlareSolverr ({base_url})...'):
+            bypass_html, bypass_headers, bypass_err = fetch_with_cloudflare_bypass(base_url, log_fn, session_id=fs_session_id)
         if bypass_html:
             log_fn('  [+] Berhasil mengakses lewat bypass Cloudflare.')
             result['errors'].append('Halaman utama diakses via fallback bypass Cloudflare (FlareSolverr)')
@@ -575,7 +577,8 @@ def recon_single_target(base_url, log_fn):
                 log_fn(f'  [!] Diblokir dengan status {p_resp.status_code}, mencoba bypass...')
             else:
                 log_fn(f'  [!] Gagal mengakses {path_url} -> {p_err}, mencoba bypass...')
-            p_bypass_html, p_bypass_headers, p_bypass_err = fetch_with_cloudflare_bypass(path_url, log_fn, session_id=fs_session_id)
+            with cli_ui.spinner(f'Mencoba bypass Cloudflare via FlareSolverr ({path_url})...'):
+                p_bypass_html, p_bypass_headers, p_bypass_err = fetch_with_cloudflare_bypass(path_url, log_fn, session_id=fs_session_id)
             if not p_bypass_html:
                 log_fn(f'  [!] Semua metode bypass gagal -> {p_bypass_err or p_err}')
                 continue
@@ -606,7 +609,8 @@ def recon_single_target(base_url, log_fn):
         result['pages_scanned'].append(path_url)
     domain_only = urlparse(base_url).netloc.replace('www.', '')
     log_fn(f'\n--- Tahap 3: Mencari subdomain dari {domain_only} ---')
-    subdomains = find_subdomains(domain_only, log_fn)
+    with cli_ui.spinner(f'Mencari subdomain untuk {domain_only}...'):
+        subdomains = find_subdomains(domain_only, log_fn)
     if subdomains:
         log_fn(f'  [+] Ditemukan {len(subdomains)} subdomain:')
         for sd in subdomains:
@@ -640,13 +644,15 @@ def recon_single_target(base_url, log_fn):
                 all_emails.update(o_emails)
                 all_phones.update(o_phones)
                 log_fn(f'  [*] Menjalankan fingerprint endpoint khas (WP/Joomla/cPanel/dll) ke origin...')
-                endpoint_tech = fingerprint_via_endpoints(f'https://{origin_ip}', log_fn, use_host_header=domain_only)
+                with cli_ui.spinner(f'Fingerprint endpoint ke origin {origin_ip}...'):
+                    endpoint_tech = fingerprint_via_endpoints(f'https://{origin_ip}', log_fn, use_host_header=domain_only)
                 for tech_name in endpoint_tech:
                     merge_tech(all_tech, {tech_name: []})
                 break
         if not origin_candidates:
             log_fn('  [*] Tidak ada origin IP ketemu, coba fingerprint endpoint langsung ke domain (via Cloudflare)...')
-            endpoint_tech = fingerprint_via_endpoints(base_url, log_fn)
+            with cli_ui.spinner(f'Fingerprint endpoint ke {base_url}...'):
+                endpoint_tech = fingerprint_via_endpoints(base_url, log_fn)
             for tech_name in endpoint_tech:
                 merge_tech(all_tech, {tech_name: []})
     else:
@@ -667,7 +673,8 @@ def recon_single_target(base_url, log_fn):
     else:
         result['ip_info'] = {'ip': None, 'whois_url': None, 'data': None, 'error': ip_err}
     log_fn(f'\n--- Tahap 5: Nmap scan pada {domain_only} ---')
-    nmap_output, nmap_err = nmap_scan(domain_only)
+    with cli_ui.spinner(f'Menjalankan nmap scan pada {domain_only}...'):
+        nmap_output, nmap_err = nmap_scan(domain_only)
     if nmap_err:
         log_fn(f'  [!] Nmap gagal: {nmap_err}')
         result['nmap']['error'] = nmap_err
@@ -677,7 +684,8 @@ def recon_single_target(base_url, log_fn):
             log_fn(f'  {line}')
         result['nmap']['output'] = nmap_lines
     log_fn(f'\n--- Tahap 6: Cek TLS/SSL & kecepatan koneksi pada {domain_only} ---')
-    ssl_info = check_ssl_tls_info(domain_only)
+    with cli_ui.spinner(f'Mengecek TLS/SSL pada {domain_only}...'):
+        ssl_info = check_ssl_tls_info(domain_only)
     if ssl_info['error']:
         log_fn(f'  [!] Gagal cek TLS/SSL: {ssl_info['error']}')
     else:
@@ -723,17 +731,16 @@ def main():
     if not urls:
         print(f'[!] Tidak ada URL valid di dalam {input_path}')
         sys.exit(1)
-    print(f'=== Bulk recon: {len(urls)} target dari {input_path.name} ===\n')
+    cli_ui.run_banner(len(urls), input_path.name)
     log_lines = []
 
     def log(msg):
-        print(msg)
+        cli_ui.pretty_print(msg)
         log_lines.append(msg)
     all_results = []
     for i, url in enumerate(urls, start=1):
-        log(f'\n############################################')
-        log(f'# Target {i}/{len(urls)}: {url}')
-        log(f'############################################')
+        log_lines.append(f'\n############################################\n# Target {i}/{len(urls)}: {url}\n############################################')
+        cli_ui.target_banner(i, len(urls), url)
         target_result = recon_single_target(url, log)
         all_results.append(target_result)
     output_data = {'input_file': str(input_path.name), 'scanned_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'total_targets': len(urls), 'results': all_results}
@@ -744,7 +751,7 @@ def main():
     with open(log_filename, 'a', encoding='utf-8') as f:
         f.write('\n'.join(log_lines))
         f.write('\n\n' + '=' * 70 + '\n\n')
-    print(f'\n[✓] Hasil recon (JSON) disimpan ke: {result_filename}')
-    print(f'[✓] Log proses lengkap disimpan (append) ke file: {log_filename}')
+    cli_ui.summary_table(all_results)
+    cli_ui.done_banner(result_filename, log_filename)
 if __name__ == '__main__':
     main()
